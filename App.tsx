@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 
 import { guidelineConditions } from './src/data/conditions';
-import { formatDurationToDays, getMatches } from './src/lib/matcher';
+import { detectEmergencySignals, formatDurationToDays, getMatches } from './src/lib/matcher';
 import { MatchResult, TreatmentLine } from './src/types';
 
 const quickSymptoms = [
@@ -33,6 +33,27 @@ const quickSymptoms = [
 ];
 
 const durationUnits = ['days', 'weeks', 'months'] as const;
+const exampleCases = [
+  { label: 'Malaria-like', symptoms: 'fever, chills, headache, body aches, vomiting', duration: '3', unit: 'days' as const },
+  { label: 'UTI-like', symptoms: 'painful urination, frequent urination, suprapubic pain, fever', duration: '4', unit: 'days' as const },
+  { label: 'Meningitis-like', symptoms: 'fever, severe headache, neck stiffness, vomiting, confusion', duration: '2', unit: 'days' as const },
+];
+
+function LogoMark() {
+  return (
+    <View style={styles.logoShell}>
+      <View style={styles.logoOuterRing}>
+        <View style={styles.logoCore}>
+          <View style={styles.logoSparkTop} />
+          <View style={styles.logoSparkRight} />
+          <View style={styles.logoSparkBottom} />
+          <View style={styles.logoSparkLeft} />
+          <Text style={styles.logoLetters}>STG</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export default function App() {
   const [symptomText, setSymptomText] = useState('fever, headache, chills, body pains');
@@ -45,6 +66,7 @@ export default function App() {
   );
 
   const results = useMemo(() => getMatches(symptomText, durationDays), [durationDays, symptomText]);
+  const emergencySignals = useMemo(() => detectEmergencySignals(results), [results]);
 
   const toggleQuickSymptom = (symptom: string) => {
     const tokens = symptomText
@@ -60,17 +82,45 @@ export default function App() {
     setSymptomText(next.join(', '));
   };
 
+  const loadExample = (symptoms: string, duration: string, unit: (typeof durationUnits)[number]) => {
+    setSymptomText(symptoms);
+    setDurationValue(duration);
+    setDurationUnit(unit);
+  };
+
+  const clearInputs = () => {
+    setSymptomText('');
+    setDurationValue('');
+    setDurationUnit('days');
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <Text style={styles.kicker}>Offline STG Triage</Text>
-          <Text style={styles.title}>Possible diagnoses from Ghana STG 2017</Text>
-          <Text style={styles.subtitle}>
-            Enter symptoms and duration. Matches come only from the local Standard Treatment
-            Guidelines dataset curated from the attached PDF.
-          </Text>
+          <View style={styles.heroTopRow}>
+            <LogoMark />
+            <View style={styles.heroCopy}>
+              <Text style={styles.kicker}>Offline STG Triage</Text>
+              <Text style={styles.title}>Possible diagnoses from Ghana STG 2017</Text>
+              <Text style={styles.subtitle}>
+                Enter symptoms and duration. Matches come only from the local Standard Treatment
+                Guidelines dataset curated from the attached PDF.
+              </Text>
+            </View>
+          </View>
+          <View style={styles.heroBadgeRow}>
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>Local-only</Text>
+            </View>
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>Fast triage hints</Text>
+            </View>
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>Ghana STG based</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.panel}>
@@ -83,6 +133,12 @@ export default function App() {
             placeholderTextColor="#7e7a72"
             style={styles.textArea}
           />
+          <View style={styles.actionsRow}>
+            <Text style={styles.helperText}>Use commas, for example: fever, cough, breathlessness</Text>
+            <Pressable onPress={clearInputs} style={styles.clearButton}>
+              <Text style={styles.clearButtonText}>Clear</Text>
+            </Pressable>
+          </View>
 
           <Text style={styles.label}>Quick add</Text>
           <View style={styles.chips}>
@@ -127,6 +183,20 @@ export default function App() {
               })}
             </View>
           </View>
+
+          <Text style={styles.label}>Example cases</Text>
+          <View style={styles.examplesRow}>
+            {exampleCases.map((example) => (
+              <Pressable
+                key={example.label}
+                onPress={() => loadExample(example.symptoms, example.duration, example.unit)}
+                style={styles.exampleCard}
+              >
+                <Text style={styles.exampleTitle}>{example.label}</Text>
+                <Text style={styles.exampleText}>{example.symptoms}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
 
         <View style={styles.infoStrip}>
@@ -143,6 +213,15 @@ export default function App() {
             These are guideline-based suggestions, not a confirmed diagnosis.
           </Text>
         </View>
+
+        {!!emergencySignals.length && (
+          <View style={styles.globalAlert}>
+            <Text style={styles.globalAlertTitle}>Urgent review suggested</Text>
+            <Text style={styles.globalAlertText}>
+              The current symptom pattern includes urgent features: {emergencySignals.join(', ')}.
+            </Text>
+          </View>
+        )}
 
         {results.length ? (
           results.map((result: MatchResult, index: number) => (
@@ -177,6 +256,13 @@ export default function App() {
                   {result.matchedSymptoms.length ? result.matchedSymptoms.join(', ') : 'limited overlap'}
                 </Text>
               </View>
+
+              {!!result.missingHallmarks.length && (
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Not yet seen:</Text>
+                  <Text style={styles.metaValue}>{result.missingHallmarks.join(', ')}</Text>
+                </View>
+              )}
 
               <View style={styles.metaRow}>
                 <Text style={styles.metaLabel}>Duration fit:</Text>
@@ -234,6 +320,14 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     padding: 22,
   },
+  heroTopRow: {
+    flexDirection: 'row',
+    gap: 16,
+    alignItems: 'center',
+  },
+  heroCopy: {
+    flex: 1,
+  },
   kicker: {
     color: '#bfe2cf',
     fontSize: 12,
@@ -253,6 +347,92 @@ const styles = StyleSheet.create({
     color: '#d7e8df',
     fontSize: 15,
     lineHeight: 22,
+  },
+  heroBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 18,
+  },
+  heroBadge: {
+    backgroundColor: 'rgba(255, 248, 233, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 248, 233, 0.18)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  heroBadgeText: {
+    color: '#f0e7d7',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  logoShell: {
+    width: 92,
+    height: 92,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoOuterRing: {
+    width: 92,
+    height: 92,
+    borderRadius: 28,
+    backgroundColor: '#f4ead6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-8deg' }],
+    shadowColor: '#091f1a',
+    shadowOpacity: 0.24,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
+  },
+  logoCore: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    backgroundColor: '#8b5e34',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  logoLetters: {
+    color: '#fff7ed',
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  logoSparkTop: {
+    position: 'absolute',
+    top: 8,
+    width: 26,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: '#f0b45d',
+  },
+  logoSparkRight: {
+    position: 'absolute',
+    right: 8,
+    width: 10,
+    height: 26,
+    borderRadius: 999,
+    backgroundColor: '#f0b45d',
+  },
+  logoSparkBottom: {
+    position: 'absolute',
+    bottom: 8,
+    width: 26,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: '#f0b45d',
+  },
+  logoSparkLeft: {
+    position: 'absolute',
+    left: 8,
+    width: 10,
+    height: 26,
+    borderRadius: 999,
+    backgroundColor: '#f0b45d',
   },
   panel: {
     backgroundColor: '#fffaf2',
@@ -300,6 +480,28 @@ const styles = StyleSheet.create({
   durationRow: {
     gap: 12,
   },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  helperText: {
+    flex: 1,
+    color: '#70665b',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  clearButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#eadfd1',
+  },
+  clearButtonText: {
+    color: '#433b33',
+    fontWeight: '700',
+  },
   durationInput: {
     backgroundColor: '#efe8dc',
     borderRadius: 18,
@@ -346,6 +548,25 @@ const styles = StyleSheet.create({
     color: '#315e56',
     lineHeight: 20,
   },
+  examplesRow: {
+    gap: 10,
+  },
+  exampleCard: {
+    backgroundColor: '#efe8dc',
+    borderRadius: 18,
+    padding: 14,
+    gap: 4,
+  },
+  exampleTitle: {
+    color: '#2b241d',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  exampleText: {
+    color: '#60574e',
+    lineHeight: 19,
+    fontSize: 13,
+  },
   resultsHeader: {
     gap: 4,
   },
@@ -357,6 +578,21 @@ const styles = StyleSheet.create({
   resultsCaption: {
     color: '#625950',
     fontSize: 14,
+  },
+  globalAlert: {
+    backgroundColor: '#8b2f1f',
+    borderRadius: 24,
+    padding: 18,
+    gap: 4,
+  },
+  globalAlertTitle: {
+    color: '#fff4ed',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  globalAlertText: {
+    color: '#f7ddd4',
+    lineHeight: 20,
   },
   card: {
     backgroundColor: '#fffaf2',

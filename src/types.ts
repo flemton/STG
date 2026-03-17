@@ -30,6 +30,7 @@ export type MatchResult = {
   score: number;
   matchedSymptoms: string[];
   missingHallmarks: string[];
+  matchedRedFlags: string[];
   durationFit: 'strong' | 'partial' | 'weak';
   confidenceLabel: 'High' | 'Moderate' | 'Low';
 };
