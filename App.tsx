@@ -243,6 +243,53 @@ function SuggestionStrip({
   );
 }
 
+function DiseaseAutocomplete({
+  suggestions,
+  onPick,
+}: {
+  suggestions: DiseaseSearchResult[];
+  onPick: (result: DiseaseSearchResult) => void;
+}) {
+  if (!suggestions.length) {
+    return null;
+  }
+
+  return (
+    <View style={styles.suggestionBox}>
+      <Text style={styles.suggestionLabel}>Suggested disease names</Text>
+      <View style={styles.autocompleteList}>
+        {suggestions.map((result) => (
+          <Pressable
+            key={`search-suggestion-${result.entry.id}`}
+            onPress={() => onPick(result)}
+            style={styles.autocompleteRow}
+          >
+            <View style={styles.autocompleteCopy}>
+              <Text style={styles.autocompleteTitle}>{result.entry.title}</Text>
+              <Text style={styles.autocompleteMeta}>
+                {result.matchStrength === 'fuzzy'
+                  ? 'Did you mean this STG condition?'
+                  : result.matchStrength === 'alias'
+                    ? 'Matched from a common alias'
+                    : 'Strong search suggestion'}
+              </Text>
+            </View>
+            <View style={styles.autocompleteBadge}>
+              <Text style={styles.autocompleteBadgeText}>
+                {result.matchStrength === 'fuzzy'
+                  ? 'Typo fix'
+                  : result.matchStrength === 'alias'
+                    ? 'Alias'
+                    : 'Pick'}
+              </Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function SearchDetail({
   entry,
   age,
@@ -382,6 +429,19 @@ export default function App() {
   );
 
   const searchResults = useMemo(() => searchDiseases(diseaseQuery), [diseaseQuery]);
+  const searchAutocomplete = useMemo(() => searchResults.slice(0, 6), [searchResults]);
+  const typoCorrectionSuggestion = useMemo(() => {
+    if (!diseaseQuery.trim()) {
+      return null;
+    }
+
+    const top = searchAutocomplete[0];
+    if (!top) {
+      return null;
+    }
+
+    return top.matchStrength === 'fuzzy' ? top : null;
+  }, [diseaseQuery, searchAutocomplete]);
   const selectedSearchEntry = useMemo(() => {
     if (selectedSearchId) {
       return searchResults.find((result) => result.entry.id === selectedSearchId)?.entry ?? searchResults[0]?.entry ?? null;
@@ -909,6 +969,29 @@ export default function App() {
                   <Text style={styles.secondaryButtonText}>Clear search</Text>
                 </Pressable>
               </View>
+              {!!typoCorrectionSuggestion && (
+                <Pressable
+                  onPress={() => {
+                    setDiseaseQuery(typoCorrectionSuggestion.entry.title);
+                    setSelectedSearchId(typoCorrectionSuggestion.entry.id);
+                  }}
+                  style={styles.didYouMeanBox}
+                >
+                  <Text style={styles.didYouMeanTitle}>Did you mean?</Text>
+                  <Text style={styles.didYouMeanText}>
+                    {typoCorrectionSuggestion.entry.title}
+                  </Text>
+                </Pressable>
+              )}
+              {!!diseaseQuery.trim() && (
+                <DiseaseAutocomplete
+                  suggestions={searchAutocomplete}
+                  onPick={(result) => {
+                    setDiseaseQuery(result.entry.title);
+                    setSelectedSearchId(result.entry.id);
+                  }}
+                />
+              )}
             </View>
 
             <View style={styles.infoStrip}>
@@ -1202,6 +1285,64 @@ const styles = StyleSheet.create({
     color: '#73685b',
     fontSize: 11,
     fontWeight: '600',
+  },
+  autocompleteList: {
+    gap: 8,
+  },
+  autocompleteRow: {
+    backgroundColor: '#e7dccb',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  autocompleteCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  autocompleteTitle: {
+    color: '#2f2a24',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  autocompleteMeta: {
+    color: '#6f6559',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  autocompleteBadge: {
+    backgroundColor: '#fff7ea',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  autocompleteBadgeText: {
+    color: '#80572f',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  didYouMeanBox: {
+    backgroundColor: '#f1e5cf',
+    borderRadius: 18,
+    padding: 14,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#dfc79d',
+  },
+  didYouMeanTitle: {
+    color: '#8a5b2c',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  didYouMeanText: {
+    color: '#2d261d',
+    fontSize: 16,
+    fontWeight: '800',
   },
   validationText: {
     color: '#9a3d2c',
