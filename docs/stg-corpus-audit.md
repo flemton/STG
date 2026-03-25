@@ -1,0 +1,276 @@
+# STG Corpus Audit
+
+- PDF TOC entries parsed: `263`
+- Body sections detected: `226`
+- Generated searchable entries: `260`
+- TOC fallbacks used: `262`
+- TOC entries still missing after generation: `0`
+
+## TOC fallback entries
+
+- `1. Diarrhoea` [Disorders of the Gastrointestinal Tract] p11
+- `2. Rotavirus Disease and Diarrhoea` [Disorders of the Gastrointestinal Tract] p18
+- `3. Constipation` [Disorders of the Gastrointestinal Tract] p19
+- `4. Peptic Ulcer Disease` [Disorders of the Gastrointestinal Tract] p22
+- `5. Gastro-oesophageal Reflux Disease` [Disorders of the Gastrointestinal Tract] p25
+- `6. Pain Originating from the Oesophagus` [Disorders of the Gastrointestinal Tract] p28
+- `7. Haemorrhoids` [Disorders of the Gastrointestinal Tract] p29
+- `9. Jaundice` [Disorders of the Liver] p35
+- `10. Acute Hepatitis` [Disorders of the Liver] p37
+- `11. Chronic Hepatitis` [Disorders of the Liver] p38
+- `12. Hepatic Encephalopathy` [Disorders of the Liver] p42
+- `13. Ascites` [Disorders of the Liver] p46
+- `14. Vomiting` [Disorders of the Liver] p48
+- `15. Hepatocellular Carcinoma` [Disorders of the Liver] p53
+- `16. Drugs and the Liver` [Disorders of the Liver] p55
+- `17. Malnutrition` [Nutritional Disorders] p58
+- `17. Anaemia` [Haematological Disorders] p62
+- `18. Bleeding Disorders` [Haematological Disorders] p65
+- `19. Sickle Cell Disease` [Haematological Disorders] p69
+- `20. Plasma Cell Myeloma` [Haematological Disorders] p73
+- `21. Leukaemia` [Haematological Disorders] p75
+- `22. Malignant Lymphoma` [Haematological Disorders] p77
+- `23. Immunisation` [Immunisable Diseases] p80
+- `24. Measles` [Immunisable Diseases] p82
+- `25. Pertussis` [Immunisable Diseases] p84
+- `26. Tetanus` [Immunisable Diseases] p86
+- `27. Poliomyelitis` [Immunisable Diseases] p89
+- `28. Diphtheria` [Immunisable Diseases] p90
+- `29. Yellow Fever` [Immunisable Diseases] p92
+- `30. Haemophilus Influenzae type b Disease` [Immunisable Diseases] p94
+- `31. Pneumococcal Disease` [Immunisable Diseases] p95
+- `32. Hepatitis` [Immunisable Diseases] p96
+- `33. Rotavirus Disease` [Immunisable Diseases] p96
+- `34. Sick newborn` [Problems of the Newborn (Neonate)] p97
+- `35. Neonatal Hypoglycaemia` [Problems of the Newborn (Neonate)] p100
+- `36. Neonatal Jaundice` [Problems of the Newborn (Neonate)] p101
+- `37. Birth Injuries` [Problems of the Newborn (Neonate)] p104
+- `38. Neonatal conjunctivitis` [Problems of the Newborn (Neonate)] p106
+- `39. Retinoblastoma` [Problems of the Newborn (Neonate)] p108
+- `40. Wilms Tumour` [Problems of the Newborn (Neonate)] p110
+- `41. Chest Pain` [Disorders of the Cardiovascular System] p113
+- `42. Ischaemic Heart Disease` [Disorders of the Cardiovascular System] p115
+- `43. Dyspnoea` [Disorders of the Cardiovascular System] p121
+- `44. Deep Vein Thrombosis (DVT)` [Disorders of the Cardiovascular System] p123
+- `45. Pulmonary Embolism` [Disorders of the Cardiovascular System] p127
+- `46. Stroke` [Disorders of the Cardiovascular System] p129
+- `47. Heart Failure` [Disorders of the Cardiovascular System] p134
+- `48. Congenital Heart Disease` [Disorders of the Cardiovascular System] p140
+- `49. Hypercyanotic attack` [Disorders of the Cardiovascular System] p143
+- `50. Pericarditis` [Disorders of the Cardiovascular System] p145
+- `51. Hypertension` [Disorders of the Cardiovascular System] p146
+- `52. Hypertension in children and adolescents` [Disorders of the Cardiovascular System] p151
+- `53. Hypertension in Pregnancy` [Disorders of the Cardiovascular System] p154
+- `54. Hypertensive Emergencies` [Disorders of the Cardiovascular System] p154
+- `55. Arrhythmias` [Disorders of the Cardiovascular System] p156
+- `56. Acute Rheumatic Fever` [Disorders of the Cardiovascular System] p161
+- `57. Dizziness and Blackouts` [Disorders of the Cardiovascular System] p164
+- `58. Common Cold` [Disorders of the Respiratory System] p167
+- `59. Pneumonia` [Disorders of the Respiratory System] p169
+- `60. Bronchial Asthma` [Disorders of the Respiratory System] p175
+- `61. Acute Bronchitis` [Disorders of the Respiratory System] p180
+- `62. Chronic Bronchitis` [Disorders of the Respiratory System] p183
+- `63. Bronchiectasis` [Disorders of the Respiratory System] p187
+- `64. Lung Abscess` [Disorders of the Respiratory System] p189
+- `65. Headache` [Disorders of the Central Nervous System] p193
+- `66. Seizures` [Disorders of the Central Nervous System] p196
+- `67. Epilepsy` [Disorders of the Central Nervous System] p200
+- `68. The Unconscious Patient` [Disorders of the Central Nervous System] p203
+- `69. Attention Deficit Hyperactivity Disorder (ADHD)` [Psychiatric Disorders] p207
+- `70. The Acutely Disturbed Patient` [Psychiatric Disorders] p209
+- `71. Psychogenic Seizures` [Psychiatric Disorders] p213
+- `72. Insomnia` [Psychiatric Disorders] p214
+- `73. Depression` [Psychiatric Disorders] p216
+- `74. Schizophrenia` [Psychiatric Disorders] p220
+- `75. Bipolar Disorder` [Psychiatric Disorders] p226
+- `76. Alcohol Withdrawal Syndromes` [Psychiatric Disorders] p229
+- `77. Alcoholic Delirium Tremens` [Psychiatric Disorders] p231
+- `78. Anxiety Disorders` [Psychiatric Disorders] p233
+- `79. Substance Use Disorders` [Psychiatric Disorders] p239
+- `80. Autistic Spectrum Disorder` [Psychiatric Disorders] p242
+- `81. Boils` [Disorders of the Skin] p245
+- `82. Impetigo` [Disorders of the Skin] p246
+- `83. Cellulitis and Erysipelas` [Disorders of the Skin] p249
+- `84. Buruli Ulcer` [Disorders of the Skin] p249
+- `85. Yaws` [Disorders of the Skin] p250
+- `86. Superficial Fungal Skin Infections` [Disorders of the Skin] p252
+- `87. Pityriasis Versicolor` [Disorders of the Skin] p255
+- `88. Herpes Simplex Infections` [Disorders of the Skin] p257
+- `89. Herpes Zoster Infections` [Disorders of the Skin] p259
+- `90. Chicken pox` [Disorders of the Skin] p261
+- `91. Large Chronic Ulcers` [Disorders of the Skin] p265
+- `92. Pruritus` [Disorders of the Skin] p267
+- `93. Urticaria` [Disorders of the Skin] p272
+- `94. Reactive Erythema and Bullous Reaction` [Disorders of the Skin] p274
+- `95. Acne Vulgaris` [Disorders of the Skin] p276
+- `96. Eczema` [Disorders of the Skin] p279
+- `97. Intertrigo` [Disorders of the Skin] p283
+- `98. Diabetes Mellitus` [Endocrine and Metabolic Disorders] p287
+- `99. Diabetic Ketoacidosis` [Endocrine and Metabolic Disorders] p293
+- `100. Diabetes in Pregnancy` [Endocrine and Metabolic Disorders] p297
+- `101. Treatment-Induced Hypoglycaemia` [Endocrine and Metabolic Disorders] p298
+- `102. Dyslipidaemia` [Endocrine and Metabolic Disorders] p300
+- `103. Goitre` [Endocrine and Metabolic Disorders] p302
+- `104. Hypothyroidism` [Endocrine and Metabolic Disorders] p303
+- `105. Hyperthyroidism` [Endocrine and Metabolic Disorders] p305
+- `106. Adrenal Insufficiency` [Endocrine and Metabolic Disorders] p307
+- `107. Cushing's Syndrome` [Endocrine and Metabolic Disorders] p310
+- `108. Overweight and Obesity` [Endocrine and Metabolic Disorders] p311
+- `109. Antenatal Care` [Obstetric Care and Obstetric Disorders] p314
+- `110. Hyperemesis Gravidarum` [Obstetric Care and Obstetric Disorders] p322
+- `111. Hypertension in Pregnancy` [Obstetric Care and Obstetric Disorders] p323
+- `112. Pre-eclampsia` [Obstetric Care and Obstetric Disorders] p325
+- `113. Severe Pre-Eclampsia and Imminent Eclampsia` [Obstetric Care and Obstetric Disorders] p326
+- `114. Eclampsia` [Obstetric Care and Obstetric Disorders] p328
+- `115. Malaria in Pregnancy` [Obstetric Care and Obstetric Disorders] p331
+- `116. Anaemia in Pregnancy` [Obstetric Care and Obstetric Disorders] p331
+- `117. Sickle Cell Disease in Pregnancy` [Obstetric Care and Obstetric Disorders] p334
+- `118. Diabetes Mellitus in Pregnancy` [Obstetric Care and Obstetric Disorders] p338
+- `119. Cardiac Disease in Pregnancy` [Obstetric Care and Obstetric Disorders] p341
+- `120. Jaundice in Pregnancy` [Obstetric Care and Obstetric Disorders] p343
+- `121. Post-Partum Haemorrhage` [Obstetric Care and Obstetric Disorders] p344
+- `122. Post-Partum Pyrexia` [Obstetric Care and Obstetric Disorders] p349
+- `123. Analgesia in Labour` [Obstetric Care and Obstetric Disorders] p352
+- `124. Preterm Labour in Premature Delivery` [Obstetric Care and Obstetric Disorders] p354
+- `125. Premature Rupture of the Membranes` [Obstetric Care and Obstetric Disorders] p356
+- `126. Dysmenorrhoea` [Gynaecological Disorders] p358
+- `127. Abortion` [Gynaecological Disorders] p359
+- `128. Abnormal Vaginal Bleeding` [Gynaecological Disorders] p371
+- `129. Abnormal Vaginal Discharge` [Gynaecological Disorders] p373
+- `130. Acute Lower Abdominal Pain` [Gynaecological Disorders] p379
+- `131. Female Infertility` [Gynaecological Disorders] p382
+- `132. Menopause` [Gynaecological Disorders] p384
+- `133. Carcinoma of the Cervix` [Gynaecological Disorders] p386
+- `134. Acute Glomerulonephritis` [Disorders of the Kidney and Genitourinary System] p388
+- `135. Nephrotic Syndrome` [Disorders of the Kidney and Genitourinary System] p390
+- `136. Acute Kidney Injury` [Disorders of the Kidney and Genitourinary System] p392
+- `137. Chronic Kidney Disease` [Disorders of the Kidney and Genitourinary System] p396
+- `138. Anaemia in Chronic Kidney Disease` [Disorders of the Kidney and Genitourinary System] p399
+- `139. Urinary Tract Infection` [Disorders of the Kidney and Genitourinary System] p401
+- `140. Medicines and the Kidney` [Disorders of the Kidney and Genitourinary System] p403
+- `141. Acute Cystitis` [Disorders of the Kidney and Genitourinary System] p406
+- `142. Benign Prostatic Hyperplasia` [Disorders of the Kidney and Genitourinary System] p408
+- `143. Bacterial Prostatitis` [Disorders of the Kidney and Genitourinary System] p410
+- `144. Scrotal Masses` [Disorders of the Kidney and Genitourinary System] p413
+- `145. The Empty Scrotum` [Disorders of the Kidney and Genitourinary System] p414
+- `146. Priapism` [Disorders of the Kidney and Genitourinary System] p416
+- `147. Posterior Urethral Valves` [Disorders of the Kidney and Genitourinary System] p417
+- `148. Urinary Tract Calculi` [Disorders of the Kidney and Genitourinary System] p419
+- `149. Urethral Stricture` [Disorders of the Kidney and Genitourinary System] p421
+- `150. Vasectomy (Male Sterilisation)` [Disorders of the Kidney and Genitourinary System] p422
+- `151. Acute Epididymo-orchitis` [Disorders of the Kidney and Genitourinary System] p423
+- `152. Testicular Torsion (Torsion of Spermatic Cord)` [Disorders of the Kidney and Genitourinary System] p425
+- `153. Fournier's Gangrene` [Disorders of the Kidney and Genitourinary System] p427
+- `154. Bladder Cancer` [Disorders of the Kidney and Genitourinary System] p429
+- `155. Carcinoma of Prostate` [Disorders of the Kidney and Genitourinary System] p431
+- `156. Erectile Dysfunction` [Disorders of the Kidney and Genitourinary System] p433
+- `157. Male Infertility` [Disorders of the Kidney and Genitourinary System] p435
+- `158. Haematuria` [Disorders of the Kidney and Genitourinary System] p437
+- `159. Urinary Schistosomiasis` [Disorders of the Kidney and Genitourinary System] p439
+- `160. Persistent or Recurrent Urethral Discharge` [Disorders of the Kidney and Genitourinary System] p440
+- `161. Retention of Urine` [Disorders of the Kidney and Genitourinary System] p440
+- `162. Sexually Transmitted Infections in Adults` [Sexually Transmitted Infections] p442
+- `163. STI-related Urethral Discharge in Males` [Sexually Transmitted Infections] p443
+- `164. Mycoplasma genitalum` [Sexually Transmitted Infections] p443
+- `165. STI-related Persistent or Recurrent Urethral Discharge` [Sexually Transmitted Infections] p444
+- `166. STI-related Vaginal Discharge` [Sexually Transmitted Infections] p445
+- `167. STI-related Lower Abdominal Pain in Women` [Sexually Transmitted Infections] p447
+- `168. STI-related Genital Ulcer` [Sexually Transmitted Infections] p448
+- `169. STI-related Scrotal Swelling` [Sexually Transmitted Infections] p450
+- `170. STI-related Inguinal Bubo` [Sexually Transmitted Infections] p451
+- `171. STI-related Genital Warts` [Sexually Transmitted Infections] p452
+- `172. STI-related Ano-rectal Related Syndromes` [Sexually Transmitted Infections] p453
+- `173. Sexually Transmitted Infections in Children` [Sexually Transmitted Infections] p455
+- `174. STI-related Neonatal Conjunctivitis (Opthalmia Neonatorum)` [Sexually Transmitted Infections] p455
+- `175. STI-related Urethral Discharge Syndrome in Children` [Sexually Transmitted Infections] p456
+- `176. STI-related Vaginal Discharge Syndromes in Children` [Sexually Transmitted Infections] p456
+- `177. STI-related Lower Abdominal Pain or Pelvic Inflammatory Disease Syndrome in Children` [Sexually Transmitted Infections] p457
+- `178. STI-related Genital Ulcer Syndrome in Children` [Sexually Transmitted Infections] p458
+- `179. STI-related Ano-Rectal Related Syndromes in Children` [Sexually Transmitted Infections] p459
+- `180. HIV Infection and AIDS` [Sexually Transmitted Infections] p461
+- `181. HIV Post Exposure Prophylaxis (PEP) for exposed healthcare personel` [HIV Infections and AIDS] p464
+- `182. Fever` [Infectious Diseases and Infestations] p468
+- `183. Tuberculosis` [Infectious Diseases and Infestations] p471
+- `184. Drug resistant tuberculosis (DR-TB)` [Infectious Diseases and Infestations] p476
+- `185. Typhoid Fever` [Infectious Diseases and Infestations] p479
+- `186. Malaria` [Infectious Diseases and Infestations] p482
+- `187. Uncomplicated Malaria` [Infectious Diseases and Infestations] p483
+- `188. Severe Malaria` [Infectious Diseases and Infestations] p486
+- `189. Malaria in Pregnancy` [Infectious Diseases and Infestations] p491
+- `190. Seasonal Malaria Chemoprevention (SMC)` [Infectious Diseases and Infestations] p494
+- `191. Meningitis` [Infectious Diseases and Infestations] p494
+- `192. Worm Infestation (Intestinal)` [Infectious Diseases and Infestations] p498
+- `193. Neonatal Conjunctivitis` [Eye Disorders] p503
+- `194. Xerophthalmia` [Eye Disorders] p503
+- `195. Foreign body in the eye` [Eye Disorders] p504
+- `196. Red Eye` [Eye Disorders] p506
+- `197. Glaucoma` [Eye Disorders] p508
+- `198. Cataract` [Eye Disorders] p510
+- `199. Exposure Keratopathy` [Eye Disorders] p511
+- `200. Strabismus` [Eye Disorders] p512
+- `201. Sickle Cell Disease - Retinopathy` [Eye Disorders] p513
+- `202. Endocrine and metabolic disorders with eye complications` [Eye Disorders] p514
+- `203. Stridor` [Ear, Nose and Throat Disorders] p515
+- `204. Acute Epiglottitis` [Ear, Nose and Throat Disorders] p519
+- `205. Retropharyngeal Abscess` [Ear, Nose and Throat Disorders] p521
+- `206. Pharyngitis and Tonsillitis` [Ear, Nose and Throat Disorders] p523
+- `207. Acute Sinusitis` [Ear, Nose and Throat Disorders] p526
+- `208. Acute Otitis Media` [Ear, Nose and Throat Disorders] p529
+- `209. Chronic Otitis Media` [Ear, Nose and Throat Disorders] p531
+- `210. Epistaxis` [Ear, Nose and Throat Disorders] p532
+- `211. Dental Caries` [Oral and Dental Conditions] p534
+- `212. Oral Candidiasis` [Oral and Dental Conditions] p535
+- `213. Acute Necrotising Ulcerative Gingivitis` [Oral and Dental Conditions] p536
+- `214. Bacterial Endocarditis and Prophylaxis in Dentistry` [Oral and Dental Conditions] p538
+- `215. Acute Bacterial Sialoadenitis` [Oral and Dental Conditions] p539
+- `216. Ludwig's Angina/Cervico-Facial Abscess` [Oral and Dental Conditions] p540
+- `217. Chronic Periodontal Infections` [Oral and Dental Conditions] p543
+- `218. Mouth Ulcers` [Oral and Dental Conditions] p544
+- `219. Odontogenic Infections` [Oral and Dental Conditions] p545
+- `220. Oral Squamous Cell Carcinoma` [Oral and Dental Conditions] p548
+- `221. Temporo-mandibular Joint dysfunction and masticatory muscle dysfunction` [Oral and Dental Conditions] p549
+- `222. Trigerminal Neuralgia` [Oral and Dental Conditions] p550
+- `223. Osteoarthritis` [Disorders Of The Musculoskeletal System] p552
+- `224. Rheumatoid arthritis` [Disorders Of The Musculoskeletal System] p554
+- `225. Juvenile Idiopathic Arthritis` [Disorders Of The Musculoskeletal System] p557
+- `226. Back pain` [Disorders Of The Musculoskeletal System] p560
+- `227. Fibromyalgia` [Disorders Of The Musculoskeletal System] p563
+- `228. Idiopathic inflammatory myopathies` [Disorders Of The Musculoskeletal System] p568
+- `229. Management of the Hot Swollen Joint` [Disorders Of The Musculoskeletal System] p570
+- `230. Gout` [Disorders Of The Musculoskeletal System] p572
+- `231. Pseudo-gout (chondrocalcinosis)` [Disorders Of The Musculoskeletal System] p575
+- `232. Systemic lupus erythematosus` [Disorders Of The Musculoskeletal System] p577
+- `233. Head Injuries` [Trauma And Injuries] p582
+- `234. Acute Abdomen` [Trauma And Injuries] p585
+- `235. Abdominal Trauma` [Trauma And Injuries] p588
+- `236. Closed Fractures` [Trauma And Injuries] p590
+- `237. Open Fractures` [Trauma And Injuries] p592
+- `238. Dislocations` [Trauma And Injuries] p595
+- `239. Acute orthopaedic infections` [Trauma And Injuries] p597
+- `240. Chronic Osteomyelitis and Chronic Septic Arthritis` [Trauma And Injuries] p601
+- `241. Cellulitis` [Trauma And Injuries] p604
+- `242. Necrotizing Fasciitis` [Trauma And Injuries] p608
+- `243. Hand Infections` [Trauma And Injuries] p610
+- `244. Tuberculosis in orthopaedics` [Trauma And Injuries] p615
+- `245. Rickets and Osteomalacia` [Trauma And Injuries] p616
+- `246. Scurvy` [Trauma And Injuries] p618
+- `247. Osteoporosis` [Trauma And Injuries] p619
+- `248. Sickle-cell Vaso-occlusive Crisis` [Trauma And Injuries] p620
+- `249. Avascular Necrosis` [Trauma And Injuries] p621
+- `250. Osteogenesis Imperfecta` [Trauma And Injuries] p623
+- `251. Burns` [Trauma And Injuries] p624
+- `252. Wounds` [Trauma And Injuries] p630
+- `253. Bites and Stings` [Trauma And Injuries] p632
+- `254. Shock` [Trauma And Injuries] p641
+- `255. Acute Allergic Reaction (Anaphylaxis)` [General Emergencies] p644
+- `256. Antibiotic Prophylaxis in Surgery` [Antibiotic Prophylaxis In Surgery] p647
+- `257. Management of Acute Pain` [Management of Acute Pain] p651
+- `258. Breast Cancer` [Common Malignancies] p655
+- `259. General Management of Poisoning` [Common Malignancies] p657
+- `260. Medicines Use in the Elderly` [General Management Of Poisoning] p662
+- `261. Local Anaesthetic Agents` [Local Anaesthetic Agents] p664
+- `262. Structured Approach to the Seriously Ill Child` [Structured Approach to the Seriously Ill Child] p666
+
+## Remaining missing TOC entries
+
+- None

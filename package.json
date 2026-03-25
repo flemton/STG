@@ -1,14 +1,15 @@
 {
   "name": "ghana-stg-offline-triage",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
-    "test": "node test/run-matcher-tests.cjs"
+    "test": "node test/run-matcher-tests.cjs",
+    "build:corpus": "python3 scripts/build_stg_corpus.py"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

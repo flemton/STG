@@ -2,3 +2,7 @@ node_modules
 .expo
 dist
 .DS_Store
+
+#prebuild dir
+android
+ios
