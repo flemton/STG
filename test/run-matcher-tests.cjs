@@ -221,7 +221,7 @@ const cases = [
     run() {
       const suggestions = getClinicalSuggestions('fevr, vomitt', symptomVocabulary);
       assert.equal(suggestions[0]?.term, 'vomiting');
-      assert.equal(replaceLastClinicalFragment('fevr, vomitt', 'vomiting'), 'fevr, vomiting');
+      assert.equal(replaceLastClinicalFragment('fevr, vomitt', 'vomiting'), 'fevr, vomiting, ');
     },
   },
   {
@@ -229,7 +229,13 @@ const cases = [
     run() {
       const suggestions = getClinicalSuggestions('dry conjunctiva, rhonci', signVocabulary);
       assert.equal(suggestions[0]?.term, 'rhonchi');
-      assert.equal(replaceLastClinicalFragment('dry conjunctiva, rhonci', 'rhonchi'), 'dry conjunctiva, rhonchi');
+      assert.equal(replaceLastClinicalFragment('dry conjunctiva, rhonci', 'rhonchi'), 'dry conjunctiva, rhonchi, ');
+    },
+  },
+  {
+    name: 'selecting a suggestion from an empty field leaves the next entry ready',
+    run() {
+      assert.equal(replaceLastClinicalFragment('', 'fever'), 'fever, ');
     },
   },
   {

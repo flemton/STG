@@ -313,17 +313,15 @@ export const getClinicalSuggestions = (
 
 export const replaceLastClinicalFragment = (input: string, nextTerm: string) => {
   const pieces = input.split(',');
-  if (pieces.length === 0) {
-    return nextTerm;
-  }
-
   pieces[pieces.length - 1] = ` ${nextTerm}`;
-  return pieces
+  const normalized = pieces
     .join(',')
     .replace(/^\s+/, '')
     .replace(/\s+/g, ' ')
     .replace(/\s+,/g, ',')
     .trim();
+
+  return normalized ? `${normalized}, ` : '';
 };
 
 export const canonicalizeClinicalTerms = (terms: string[], vocabulary: string[]) =>

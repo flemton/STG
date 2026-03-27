@@ -492,7 +492,8 @@ export default function App() {
       ? tokens.filter((token) => token.toLowerCase() !== value.toLowerCase())
       : [...tokens, value];
 
-    setter(next.join(', '));
+    const normalized = next.join(', ');
+    setter(!exists && normalized ? `${normalized}, ` : normalized);
   };
 
   const loadExample = (example: (typeof exampleCases)[number]) => {
