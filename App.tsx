@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useMemo, useState } from 'react';
+import { memo, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
   Pressable,
   SafeAreaView,
@@ -209,7 +209,7 @@ function SearchAgeBandCard({
   );
 }
 
-function SuggestionStrip({
+const SuggestionStrip = memo(function SuggestionStrip({
   title,
   suggestions,
   onPick,
@@ -241,9 +241,9 @@ function SuggestionStrip({
       </View>
     </View>
   );
-}
+});
 
-function DiseaseAutocomplete({
+const DiseaseAutocomplete = memo(function DiseaseAutocomplete({
   suggestions,
   onPick,
 }: {
@@ -288,6 +288,17 @@ function DiseaseAutocomplete({
       </View>
     </View>
   );
+});
+
+function useDebouncedValue<T>(value: T, delayMs: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => clearTimeout(timeout);
+  }, [delayMs, value]);
+
+  return debouncedValue;
 }
 
 function SearchDetail({
@@ -384,6 +395,12 @@ export default function App() {
   const [durationValue, setDurationValue] = useState('');
   const [durationUnit, setDurationUnit] = useState<(typeof durationUnits)[number]>('days');
 
+  const deferredSymptomText = useDeferredValue(symptomText);
+  const deferredSignText = useDeferredValue(signText);
+  const deferredDiseaseQuery = useDeferredValue(diseaseQuery);
+  const debouncedSymptomText = useDebouncedValue(symptomText, 160);
+  const debouncedSignText = useDebouncedValue(signText, 160);
+  const debouncedDiseaseQuery = useDebouncedValue(diseaseQuery, 180);
   const age = useMemo(() => formatAgeToNormalized(ageValue, ageUnit), [ageUnit, ageValue]);
   const durationDays = useMemo(
     () => formatDurationToDays(durationValue, durationUnit),
@@ -391,27 +408,31 @@ export default function App() {
   );
   const symptomSuggestions = useMemo(
     () =>
-      getClinicalSuggestions(symptomText, symptomVocabulary)
+      getClinicalSuggestions(deferredSymptomText, symptomVocabulary, 6, {
+        allowFuzzy: deferredSymptomText.trim() === debouncedSymptomText.trim(),
+      })
         .filter((entry) => entry.reason !== 'exact')
         .slice(0, 6),
-    [symptomText]
+    [debouncedSymptomText, deferredSymptomText]
   );
   const signSuggestions = useMemo(
     () =>
-      getClinicalSuggestions(signText, signVocabulary)
+      getClinicalSuggestions(deferredSignText, signVocabulary, 6, {
+        allowFuzzy: deferredSignText.trim() === debouncedSignText.trim(),
+      })
         .filter((entry) => entry.reason !== 'exact')
         .slice(0, 6),
-    [signText]
+    [debouncedSignText, deferredSignText]
   );
 
   const triageResults = useMemo(
-    () => getMatches(symptomText, signText, durationDays, age),
-    [age, durationDays, signText, symptomText]
+    () => getMatches(deferredSymptomText, deferredSignText, durationDays, age),
+    [age, deferredSignText, deferredSymptomText, durationDays]
   );
   const emergencySignals = useMemo(() => detectEmergencySignals(triageResults), [triageResults]);
   const relatedSections = useMemo(
-    () => getRelatedSections(symptomText, signText),
-    [signText, symptomText]
+    () => getRelatedSections(deferredSymptomText, deferredSignText),
+    [deferredSignText, deferredSymptomText]
   );
   const likelyMatches = useMemo(
     () =>
@@ -428,10 +449,17 @@ export default function App() {
     [triageResults]
   );
 
-  const searchResults = useMemo(() => searchDiseases(diseaseQuery), [diseaseQuery]);
+  const searchResults = useMemo(
+    () =>
+      searchDiseases(deferredDiseaseQuery, {
+        allowFuzzy: deferredDiseaseQuery.trim() === debouncedDiseaseQuery.trim(),
+        limit: 16,
+      }),
+    [debouncedDiseaseQuery, deferredDiseaseQuery]
+  );
   const searchAutocomplete = useMemo(() => searchResults.slice(0, 6), [searchResults]);
   const typoCorrectionSuggestion = useMemo(() => {
-    if (!diseaseQuery.trim()) {
+    if (!deferredDiseaseQuery.trim()) {
       return null;
     }
 
@@ -441,7 +469,7 @@ export default function App() {
     }
 
     return top.matchStrength === 'fuzzy' ? top : null;
-  }, [diseaseQuery, searchAutocomplete]);
+  }, [deferredDiseaseQuery, searchAutocomplete]);
   const selectedSearchEntry = useMemo(() => {
     if (selectedSearchId) {
       return searchResults.find((result) => result.entry.id === selectedSearchId)?.entry ?? searchResults[0]?.entry ?? null;

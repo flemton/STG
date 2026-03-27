@@ -233,6 +233,23 @@ const cases = [
     },
   },
   {
+    name: 'clinical suggestions stay empty for very short fragments',
+    run() {
+      assert.equal(getClinicalSuggestions('f', symptomVocabulary).length, 0);
+      assert.equal(getClinicalSuggestions('n', signVocabulary).length, 0);
+    },
+  },
+  {
+    name: 'clinical suggestions prefer direct prefix hits before fuzzy fallback',
+    run() {
+      const suggestions = getClinicalSuggestions('dry con', signVocabulary, 6, {
+        allowFuzzy: false,
+      });
+      assert.equal(suggestions[0]?.reason, 'prefix');
+      assert.equal(suggestions[0]?.term, 'dry conjunctiva');
+    },
+  },
+  {
     name: 'generated corpus search contributes broader STG sections for non-curated topics',
     run() {
       const results = searchDiseases('haemorrhoids');
@@ -261,6 +278,16 @@ const cases = [
       const results = searchDiseases('meningtis');
       assert.equal(results[0]?.entry.title, 'Meningitis');
       assert.ok(['fuzzy', 'prefix', 'token'].includes(results[0]?.matchStrength));
+    },
+  },
+  {
+    name: 'search stays on the fast path when fuzzy matching is disabled',
+    run() {
+      const results = searchDiseases('meningtis', { allowFuzzy: false, limit: 16 });
+      assert.equal(results.length, 0);
+      const prefixResults = searchDiseases('men', { allowFuzzy: false, limit: 16 });
+      assert.equal(prefixResults[0]?.entry.title, 'Meningitis');
+      assert.equal(prefixResults[0]?.matchStrength, 'prefix');
     },
   },
   {
