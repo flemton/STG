@@ -18,6 +18,20 @@ npm start
 
 Then open the Expo app on Android or iOS.
 
+## Validation
+
+```bash
+npm test
+npx tsc --noEmit
+npx expo-doctor
+```
+
+Web bundle/export can also be verified with:
+
+```bash
+npx expo export --platform web
+```
+
 ## Current guideline coverage
 
 The app currently includes curated entries for:
@@ -37,3 +51,4 @@ The app currently includes curated entries for:
 
 - This is a lightweight offline decision-support interface, not a confirmed diagnosis engine.
 - The matching logic is intentionally transparent and fast so it can run entirely on-device.
+- The UI includes quick symptom chips, reusable example cases, and urgent-signal highlighting for emergency patterns.
