@@ -159,6 +159,50 @@ def split_items(lines: Iterable[str]) -> list[str]:
     return list(dict.fromkeys(items))
 
 
+def clean_term_items(items: Iterable[str], title: str) -> list[str]:
+    cleaned: list[str] = []
+    title_key = normalize_search_text(title)
+    noise_values = {
+        "adult",
+        "adults",
+        "child",
+        "children",
+        "infant",
+        "infants",
+        "neonate",
+        "neonates",
+        "look at",
+        "feel",
+        "decide",
+        "treatment plan",
+        "treatment algorithm",
+    }
+
+    for raw_item in items:
+        item = re.sub(r"\s+", " ", raw_item).strip(" -")
+        item = re.sub(rf"\s*-\s*{re.escape(title)}\s*$", "", item, flags=re.I)
+        item = re.sub(r"\s*-\s*Chapter\s+\d+.*$", "", item, flags=re.I)
+        item = re.sub(r"\s+", " ", item).strip(" -")
+        if not item:
+            continue
+
+        normalized = normalize_search_text(item)
+        if not normalized or normalized == title_key:
+            continue
+        if normalized in noise_values:
+            continue
+        if normalized.startswith("chapter "):
+            continue
+        if normalized.startswith("table ") or normalized.startswith("box "):
+            continue
+        if "standard treatment guidelines" in normalized:
+            continue
+
+        cleaned.append(item)
+
+    return list(dict.fromkeys(cleaned))
+
+
 def build_aliases(title: str) -> list[str]:
     aliases: set[str] = set()
     normalized = normalize_search_text(title)
@@ -196,6 +240,7 @@ class TocEntry:
     title: str
     chapter: str
     start_page: int
+    pdf_start_page: int | None = None
 
 
 @dataclass
@@ -357,6 +402,45 @@ def extract_page_texts(reader: PdfReader) -> list[str]:
     return [(page.extract_text() or "") for page in reader.pages]
 
 
+def detect_pdf_page_offset(page_texts: list[str]) -> int:
+    offsets: list[int] = []
+
+    for pdf_page_number, page_text in enumerate(page_texts, start=1):
+        lines = [normalize_line(line) for line in page_text.splitlines()[:12]]
+        printed_page: int | None = None
+
+        for line in lines:
+            if re.fullmatch(r"\d{1,3}", line):
+                value = int(line)
+                if 1 <= value <= len(page_texts):
+                    printed_page = value
+                    break
+
+        if printed_page is None:
+            continue
+
+        offsets.append(pdf_page_number - printed_page)
+
+    if not offsets:
+        return 0
+
+    counts: dict[int, int] = {}
+    for offset in offsets:
+        counts[offset] = counts.get(offset, 0) + 1
+
+    return max(counts.items(), key=lambda item: item[1])[0]
+
+
+def attach_pdf_pages_to_toc_entries(toc_entries: list[TocEntry], page_texts: list[str]) -> int:
+    offset = detect_pdf_page_offset(page_texts)
+    page_count = len(page_texts)
+
+    for entry in toc_entries:
+        entry.pdf_start_page = max(1, min(page_count, entry.start_page + offset))
+
+    return offset
+
+
 def extract_sections(page_texts: list[str]) -> list[Section]:
     sections: list[Section] = []
     current_section: Section | None = None
@@ -402,6 +486,10 @@ def line_matches_toc_heading(line: str, toc_entry: TocEntry) -> bool:
         return True
     if normalized_line.startswith(f"{toc_entry.number} {title_key}"):
         return True
+    if normalized_line.endswith(title_key):
+        return True
+    if title_key in normalized_line and normalized_line.split(" ", 1)[0].isdigit():
+        return True
     return False
 
 
@@ -414,19 +502,31 @@ def extract_fallback_section(
     content: list[str] = []
     started = False
     stop = False
-    final_page = min(next_entry.start_page if next_entry else len(page_texts), len(page_texts))
+    start_page = toc_entry.pdf_start_page or toc_entry.start_page
+    next_start_page = (
+        next_entry.pdf_start_page if next_entry and next_entry.pdf_start_page is not None else next_entry.start_page if next_entry else len(page_texts)
+    )
+    final_page = min(next_start_page, len(page_texts))
 
-    for page_number in range(toc_entry.start_page, final_page + 1):
+    for page_number in range(start_page, final_page + 1):
         raw_lines = [normalize_line(line) for line in page_texts[page_number - 1].splitlines()]
         cleaned = [line for line in raw_lines if not is_header_or_noise(line)]
 
-        for line in cleaned:
-            if not started:
-                if line_matches_toc_heading(line, toc_entry):
-                    started = True
-                    pages.add(page_number)
-                continue
+        if not started:
+            matching_indexes = [
+                index for index, line in enumerate(cleaned) if line_matches_toc_heading(line, toc_entry)
+            ]
+            if matching_indexes:
+                started = True
+                pages.add(page_number)
+                start_index = matching_indexes[-1] if page_number == start_page else matching_indexes[0]
+                relevant_lines = cleaned[start_index + 1 :]
+            else:
+                relevant_lines = []
+        else:
+            relevant_lines = cleaned
 
+        for line in relevant_lines:
             if next_entry and line_matches_toc_heading(line, next_entry):
                 stop = True
                 break
@@ -438,8 +538,11 @@ def extract_fallback_section(
             break
 
     if not content:
-        start_page = toc_entry.start_page
-        end_page = min((next_entry.start_page - 1) if next_entry else len(page_texts), len(page_texts))
+        start_page = toc_entry.pdf_start_page or toc_entry.start_page
+        end_page = min(
+            ((next_entry.pdf_start_page or next_entry.start_page) - 1) if next_entry else len(page_texts),
+            len(page_texts)
+        )
         if end_page < start_page:
             end_page = start_page
 
@@ -476,13 +579,17 @@ def merge_sections_with_toc(
         for section_index, section in enumerate(sections):
             if section_index in used_indexes:
                 continue
-            if section.number != toc_entry.number:
+            title_match = normalize_search_text(section.title) == normalize_search_text(toc_entry.title)
+            number_match = section.number == toc_entry.number
+            if not number_match and not title_match:
                 continue
 
             first_page = min(section.pages) if section.pages else 9999
             chapter_penalty = 0 if normalize_search_text(section.chapter) == normalize_search_text(toc_entry.chapter) else 1
-            page_distance = abs(first_page - toc_entry.start_page)
-            score = (chapter_penalty, page_distance)
+            target_page = toc_entry.pdf_start_page or toc_entry.start_page
+            page_distance = abs(first_page - target_page)
+            title_penalty = 0 if title_match else 1
+            score = (title_penalty, chapter_penalty, page_distance)
 
             if best_score is None or score < best_score:
                 best_score = score
@@ -511,24 +618,24 @@ def merge_sections_with_toc(
 def build_generated_entry(section: Section) -> dict | None:
     blocks = parse_section_blocks(section.content)
 
-    causes = split_items(blocks["causes"])
-    symptoms = split_items(blocks["symptoms"])
-    signs = split_items(blocks["signs"])
-    signs_and_symptoms = split_items(blocks["signs_and_symptoms"])
-    diagnostic_clues = split_items(blocks["diagnostic_clues"])
-    diagnosis = split_items(blocks["diagnosis"])
-    investigations = split_items(blocks["investigations"])
-    treatment = split_items(blocks["treatment"])
-    treatment_objectives = split_items(blocks["treatment_objectives"])
-    non_pharmacological = split_items(blocks["non_pharmacological_treatment"])
-    pharmacological = split_items(blocks["pharmacological_treatment"])
-    referral = split_items(blocks["referral_criteria"])
-    prevention = split_items(blocks["prevention"])
-    counselling = split_items(blocks["counselling_points"])
-    complications = split_items(blocks["complications"])
-    diagnostic_notes = split_items(blocks["body"] + blocks["diagnosis"])
+    causes = clean_term_items(split_items(blocks["causes"]), section.title)
+    symptoms = clean_term_items(split_items(blocks["symptoms"]), section.title)
+    signs = clean_term_items(split_items(blocks["signs"]), section.title)
+    signs_and_symptoms = clean_term_items(split_items(blocks["signs_and_symptoms"]), section.title)
+    diagnostic_clues = clean_term_items(split_items(blocks["diagnostic_clues"]), section.title)
+    diagnosis = clean_term_items(split_items(blocks["diagnosis"]), section.title)
+    investigations = clean_term_items(split_items(blocks["investigations"]), section.title)
+    treatment = clean_term_items(split_items(blocks["treatment"]), section.title)
+    treatment_objectives = clean_term_items(split_items(blocks["treatment_objectives"]), section.title)
+    non_pharmacological = clean_term_items(split_items(blocks["non_pharmacological_treatment"]), section.title)
+    pharmacological = clean_term_items(split_items(blocks["pharmacological_treatment"]), section.title)
+    referral = clean_term_items(split_items(blocks["referral_criteria"]), section.title)
+    prevention = clean_term_items(split_items(blocks["prevention"]), section.title)
+    counselling = clean_term_items(split_items(blocks["counselling_points"]), section.title)
+    complications = clean_term_items(split_items(blocks["complications"]), section.title)
+    diagnostic_notes = clean_term_items(split_items(blocks["body"] + blocks["diagnosis"]), section.title)
     if not diagnostic_notes:
-        diagnostic_notes = split_items(section.content)
+        diagnostic_notes = clean_term_items(split_items(section.content), section.title)
 
     if signs_and_symptoms:
         if not symptoms:
@@ -634,6 +741,7 @@ def write_audit_report(
     sections: list[Section],
     fallback_entries: list[TocEntry],
     generated_entries: list[dict],
+    page_offset: int,
 ) -> None:
     generated_titles = {normalize_search_text(entry["title"]) for entry in generated_entries}
     missing = [entry for entry in toc_entries if normalize_search_text(entry.title) not in generated_titles]
@@ -646,6 +754,7 @@ def write_audit_report(
         f"- Generated searchable entries: `{len(generated_entries)}`",
         f"- TOC fallbacks used: `{len(fallback_entries)}`",
         f"- TOC entries still missing after generation: `{len(missing)}`",
+        f"- Detected PDF page offset: `+{page_offset}` PDF pages relative to printed STG page numbers",
         "",
         "## TOC fallback entries",
         "",
@@ -682,6 +791,7 @@ def main() -> int:
     reader = PdfReader(str(pdf_path))
     toc_entries = parse_toc_entries(reader)
     page_texts = extract_page_texts(reader)
+    page_offset = attach_pdf_pages_to_toc_entries(toc_entries, page_texts)
     body_sections = extract_sections(page_texts)
     merged_sections, fallback_entries = merge_sections_with_toc(body_sections, toc_entries, page_texts)
 
@@ -689,10 +799,11 @@ def main() -> int:
     deduped = list({entry["id"]: entry for entry in entries}.values())
 
     write_typescript(deduped)
-    write_audit_report(toc_entries, body_sections, fallback_entries, deduped)
+    write_audit_report(toc_entries, body_sections, fallback_entries, deduped, page_offset)
     print(
         f"Wrote {len(deduped)} generated STG entries to {OUTPUT_FILE} "
-        f"using {len(toc_entries)} TOC entries and {len(fallback_entries)} TOC fallbacks."
+        f"using {len(toc_entries)} TOC entries, page offset +{page_offset}, "
+        f"and {len(fallback_entries)} TOC fallbacks."
     )
     return 0
 
