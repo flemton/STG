@@ -7,6 +7,7 @@ import {
 import {
   AgeUnit,
   ConditionAgeBand,
+  GuidedTriageContext,
   GuidelineCondition,
   MatchResult,
   NormalizedAge,
@@ -39,6 +40,20 @@ const aliases: Record<string, string[]> = {
   'grey sclera': ['gray sclera'],
   'conjunctival folding': ['conjunctival wrinkling', 'wrinkling conjunctiva'],
   keratomalacia: ['cloudy cornea'],
+  'right upper abdominal pain': ['right hypochondrial pain'],
+  'bright red rectal bleeding': ['passage of bright red blood at defaecation', 'bright red blood per rectum'],
+  'anal swelling': ['swelling at anus', 'swelling at the anus'],
+  'pruritus ani': ['perianal itching', 'perianal irritation'],
+  'skin tags': ['redundant folds of skin'],
+  'thrombosed haemorrhoids': ['palpable thrombosed internal haemorrhoids'],
+  'epigastric pain': ['pain in the epigastrium'],
+  heartburn: ['burning chest pain', 'acid reflux'],
+  'difficulty swallowing': ['dysphagia'],
+  'pain on swallowing': ['odynophagia'],
+  'dark urine': ['yellow or dark coloured urine', 'deep yellow discolouration of urine'],
+  'passing hard stools': ['hard stools'],
+  'fetor hepaticus': ['musty breath'],
+  asterixis: ['flapping tremor'],
 };
 
 const aliasVocabulary = Array.from(
@@ -88,13 +103,7 @@ const expandTerms = (terms: string[]) => {
 
   for (const term of terms) {
     for (const [canonical, values] of Object.entries(aliases)) {
-      if (
-        term === canonical ||
-        values.includes(term) ||
-        values.some((value) => value.includes(term) || term.includes(value)) ||
-        canonical.includes(term) ||
-        term.includes(canonical)
-      ) {
+      if (term === canonical || values.includes(term)) {
         expanded.add(canonical);
         values.forEach((value) => expanded.add(value));
       }
@@ -108,9 +117,7 @@ const matchesTerm = (input: string, term: string) => {
   if (input === term || input.includes(term)) {
     return true;
   }
-
-  const inputWords = input.split(' ').filter(Boolean).length;
-  return inputWords >= 2 && input.length >= 6 && term.includes(input);
+  return false;
 };
 
 const collectMatches = (terms: string[], inputs: string[]) =>
@@ -224,7 +231,8 @@ const scoreCondition = (
   symptomInputs: string[],
   signInputs: string[],
   durationDays: number | null,
-  age: NormalizedAge
+  age: NormalizedAge,
+  guidedContext?: GuidedTriageContext
 ): MatchResult | null => {
   const allInputs = Array.from(new Set([...symptomInputs, ...signInputs]));
   const selected = pickBand(condition, symptomInputs, signInputs, allInputs, age);
@@ -272,6 +280,12 @@ const scoreCondition = (
   if (primaryEvidenceCount === 0) {
     return null;
   }
+
+  const guidedSymptoms = new Set(guidedContext?.selectedSymptoms ?? []);
+  const guidedSigns = new Set(guidedContext?.selectedSigns ?? []);
+  const structuredSymptomHits = matchedSymptoms.filter((term) => guidedSymptoms.has(term));
+  const structuredSignHits = matchedSigns.filter((term) => guidedSigns.has(term));
+  const structuredEvidenceHits = structuredSymptomHits.length + structuredSignHits.length;
 
   const missingHallmarks = [
     ...band.evidence.hallmarkSymptoms,
@@ -325,6 +339,104 @@ const scoreCondition = (
   if (condition.id === 'urinary-tract-infection' && !hasUrinaryCoreFeature) {
     return null;
   }
+  const hasConstipationCoreFeature =
+    matchedSymptoms.some((term) =>
+      [
+        'constipation',
+        'passing hard stools',
+        'infrequent passing of stools',
+        'straining to pass stools',
+        'feeling of incomplete evacuation of bowel',
+        'inability to pass flatus',
+      ].includes(term)
+    ) ||
+    matchedSigns.some((term) =>
+      ['frequent high pitched bowel sounds', 'absent bowel sounds', 'abdominal mass', 'peritonitis'].includes(term)
+    );
+  if (condition.id === 'constipation' && !hasConstipationCoreFeature) {
+    return null;
+  }
+  const hasPudCoreFeature =
+    matchedSymptoms.some((term) =>
+      ['epigastric pain', 'burning epigastric pain', 'episodic abdominal pain'].includes(term)
+    ) || matchedSigns.includes('epigastric tenderness');
+  if (condition.id === 'peptic-ulcer-disease' && !hasPudCoreFeature) {
+    return null;
+  }
+  const hasGordCoreFeature =
+    matchedSymptoms.some((term) =>
+      [
+        'heartburn',
+        'nocturnal regurgitation',
+        'difficulty swallowing',
+        'pain on swallowing',
+        'retrosternal pain',
+        'forceful regurgitation',
+        'failure to thrive',
+        'refusing food',
+      ].includes(term)
+    ) || matchedSigns.includes('wheeze');
+  if (condition.id === 'gastro-oesophageal-reflux-disease' && !hasGordCoreFeature) {
+    return null;
+  }
+  const hasHaemorrhoidCoreFeature =
+    matchedSymptoms.some((term) =>
+      [
+        'bright red rectal bleeding',
+        'passage of bright red blood at defaecation',
+        'rectal bleeding',
+        'anal swelling',
+        'pruritus ani',
+        'discomfort after opening bowels',
+        'anal pain',
+      ].includes(term)
+    ) ||
+    matchedSigns.some((term) =>
+      ['swelling at the anus', 'skin tags', 'thrombosed haemorrhoids'].includes(term)
+    );
+  if (condition.id === 'haemorrhoids' && !hasHaemorrhoidCoreFeature) {
+    return null;
+  }
+  const hasAmoebicLiverLocalizingFeature =
+    matchedSymptoms.some((term) =>
+      ['right upper abdominal pain', 'right hypochondrial pain'].includes(term)
+    ) ||
+    matchedSigns.some((term) =>
+      ['large tender liver', 'hepatomegaly', 'tender intercostal swelling'].includes(term)
+    );
+  const hasAmoebicLiverSystemicFeature = matchedSymptoms.some((term) =>
+    ['fever', 'malaise', 'sweats', 'anorexia', 'weight loss', 'hiccups', 'cough'].includes(term)
+  );
+  if (
+    condition.id === 'amoebic-liver-abscess' &&
+    (!hasAmoebicLiverLocalizingFeature || !hasAmoebicLiverSystemicFeature)
+  ) {
+    return null;
+  }
+  const hasAcuteHepatitisCoreFeature =
+    matchedSymptoms.some((term) =>
+      ['dark urine', 'pale stools', 'right hypochondrial pain'].includes(term)
+    ) ||
+    matchedSigns.some((term) =>
+      ['jaundice', 'right hypochondrial tenderness', 'hepatomegaly'].includes(term)
+    );
+  if (condition.id === 'acute-hepatitis' && !hasAcuteHepatitisCoreFeature) {
+    return null;
+  }
+  const hasHepaticEncephalopathyNeuroFeature =
+    matchedSymptoms.some((term) =>
+      ['confusion', 'disturbed consciousness', 'personality changes'].includes(term)
+    ) ||
+    matchedSigns.some((term) => ['speech impairment', 'incoordination', 'lethargy'].includes(term));
+  const hasHepaticEncephalopathyLiverFeature =
+    matchedSymptoms.includes('jaundice') ||
+    matchedSigns.some((term) => ['asterixis', 'fetor hepaticus', 'ascites'].includes(term));
+  if (
+    condition.id === 'hepatic-encephalopathy' &&
+    (!hasHepaticEncephalopathyNeuroFeature || !hasHepaticEncephalopathyLiverFeature)
+  ) {
+    return null;
+  }
   const hallmarkGateRequired =
     hasHallmarkRequirements &&
     (band.evidence.hallmarkSymptoms.length + band.evidence.hallmarkSigns.length >= 2 ||
@@ -358,6 +470,14 @@ const scoreCondition = (
       : 0;
   const ageScore = condition.ageSensitive ? 0.55 : 0.15;
   const preferredBandScore = condition.preferredAgeBands?.includes(band.id) ? 0.35 : 0;
+  const guidedEvidenceScore =
+    structuredSymptomHits.length * 1.35 + structuredSignHits.length * 2.1;
+  const bucketBoost = guidedContext?.preferredConditionIds?.includes(condition.id) ? 1.1 : 0;
+  const offBucketPenalty =
+    guidedContext?.preferredConditionIds?.length &&
+    !guidedContext.preferredConditionIds.includes(condition.id)
+      ? 0.3
+      : 0;
   const mismatchPenalty = condition.ageSensitive && competingBandEvidence > evidenceHits ? 0.8 : 0;
   const hallmarkPenalty = needsHallmarkFindings ? 3.4 : 0;
   const genericPenalty = onlyGenericSymptoms ? 2.4 : 0;
@@ -378,9 +498,26 @@ const scoreCondition = (
     (hasSymptom(matchedSymptoms, 'diarrhoea') || hasSymptom(matchedSymptoms, 'constipation'))
       ? 1.1
       : 0;
+  const refluxClusterBonus =
+    condition.id === 'gastro-oesophageal-reflux-disease' &&
+    (hasSymptom(matchedSymptoms, 'heartburn') || hasSymptom(matchedSymptoms, 'nocturnal regurgitation'))
+      ? 1.25
+      : 0;
+  const pudSpecificBonus =
+    condition.id === 'peptic-ulcer-disease' &&
+    (hasSymptom(matchedSymptoms, 'burning epigastric pain') || matchedSigns.includes('epigastric tenderness'))
+      ? 1.2
+      : 0;
   const weakTyphoidPenalty =
     condition.id === 'typhoid-fever' && duration.fit === 'weak' && matchedSigns.length === 0
       ? 1.05
+      : 0;
+  const refluxPenaltyForPud =
+    condition.id === 'peptic-ulcer-disease' &&
+    (hasSymptom(matchedSymptoms, 'heartburn') || hasSymptom(matchedSymptoms, 'nocturnal regurgitation')) &&
+    !matchedSigns.includes('epigastric tenderness') &&
+    !hasSymptom(matchedSymptoms, 'burning epigastric pain')
+      ? 1.4
       : 0;
   const meningitisNonMeningealPenalty =
     condition.id === 'meningitis' &&
@@ -410,15 +547,21 @@ const scoreCondition = (
     hallmarkScore +
     redFlagScore +
     duration.bonus +
+    guidedEvidenceScore +
     ageScore +
     preferredBandScore -
     mismatchPenalty -
     hallmarkPenalty -
     genericPenalty -
     signMissingPenalty +
+    bucketBoost -
+    offBucketPenalty +
     acuteDiarrhoeaClusterBonus +
+    refluxClusterBonus +
+    pudSpecificBonus +
     typhoidClusterBonus -
     weakTyphoidPenalty -
+    refluxPenaltyForPud -
     meningitisNonMeningealPenalty;
 
   if (condition.id === 'meningitis' && hallmarkSignHits.length === 0 && matchedSigns.length === 0) {
@@ -449,6 +592,19 @@ const scoreCondition = (
     confidenceLabel = 'Moderate';
   }
 
+  let confidenceGateStatus: MatchResult['confidenceGateStatus'] = 'needs-more-evidence';
+  if (needsHallmarkFindings) {
+    confidenceGateStatus = 'hallmark-missing';
+  } else if (
+    confidenceLabel !== 'Low' &&
+    (structuredEvidenceHits > 0 || evidenceQuality === 'specific' || score >= 7.5)
+  ) {
+    confidenceGateStatus = 'reliable';
+  }
+
+  const allowAlternatives =
+    confidenceGateStatus === 'reliable' && confidenceLabel !== 'Low' && score >= 5;
+
   return {
     condition,
     ageBand: band,
@@ -463,6 +619,9 @@ const scoreCondition = (
     confidenceLabel,
     evidenceQuality,
     needsHallmarkFindings,
+    structuredEvidenceHits,
+    confidenceGateStatus,
+    allowAlternatives,
   };
 };
 
@@ -470,17 +629,35 @@ export const getMatches = (
   symptomText: string,
   signText: string,
   durationDays: number | null,
-  age: NormalizedAge | null
+  age: NormalizedAge | null,
+  guidedContext?: GuidedTriageContext
 ): MatchResult[] => {
   if (!age) {
     return [];
   }
 
+  const typedSymptomInputs = canonicalizeClinicalTerms(
+    splitClinicalInput(symptomText),
+    symptomNormalizationVocabulary
+  );
+  const typedSignInputs = canonicalizeClinicalTerms(
+    splitClinicalInput(signText),
+    signNormalizationVocabulary
+  );
+  const selectedSymptoms = canonicalizeClinicalTerms(
+    guidedContext?.selectedSymptoms ?? [],
+    symptomNormalizationVocabulary
+  );
+  const selectedSigns = canonicalizeClinicalTerms(
+    guidedContext?.selectedSigns ?? [],
+    signNormalizationVocabulary
+  );
+
   const symptomInputs = expandTerms(
-    canonicalizeClinicalTerms(splitClinicalInput(symptomText), symptomNormalizationVocabulary)
+    Array.from(new Set([...typedSymptomInputs, ...selectedSymptoms]))
   );
   const signInputs = expandTerms(
-    canonicalizeClinicalTerms(splitClinicalInput(signText), signNormalizationVocabulary)
+    Array.from(new Set([...typedSignInputs, ...selectedSigns]))
   );
 
   if (!symptomInputs.length && !signInputs.length) {
@@ -488,7 +665,13 @@ export const getMatches = (
   }
 
   return guidelineConditions
-    .map((condition) => scoreCondition(condition, symptomInputs, signInputs, durationDays, age))
+    .map((condition) =>
+      scoreCondition(condition, symptomInputs, signInputs, durationDays, age, {
+        ...guidedContext,
+        selectedSymptoms,
+        selectedSigns,
+      })
+    )
     .filter((result): result is MatchResult => Boolean(result))
     .sort((left, right) => {
       if (right.score !== left.score) {

@@ -32,7 +32,6 @@ const {
   formatAgeToNormalized,
   formatDurationToDays,
   getMatches,
-  getRelatedSections,
 } = require(path.join(outDir, 'lib', 'matcher.js'));
 const {
   getApplicableAgeBand,
@@ -45,7 +44,9 @@ const {
 } = require(path.join(outDir, 'lib', 'clinical-input.js'));
 const { generatedCorpus } = require(path.join(outDir, 'data', 'generated-corpus.js'));
 const {
+  searchableStgEntries,
   signVocabulary,
+  stgChapterSummaries,
   symptomVocabulary,
 } = require(path.join(outDir, 'data', 'conditions.js'));
 
@@ -195,6 +196,43 @@ const cases = [
     },
   },
   {
+    name: 'guided respiratory selections produce a single reliable primary answer',
+    run() {
+      const results = getMatches('', '', 4, age(40, 'years'), {
+        selectedSymptoms: ['cough', 'shortness of breath', 'chest pain'],
+        selectedSigns: ['chest indrawing', 'crepitations'],
+        preferredConditionIds: [
+          'pneumonia',
+          'bronchial-asthma',
+          'acute-bronchitis',
+          'common-cold',
+          'tuberculosis',
+        ],
+      });
+      assert.equal(results[0]?.condition.id, 'pneumonia');
+      assert.ok(results[0]?.structuredEvidenceHits >= 4);
+      assert.equal(results[0]?.confidenceGateStatus, 'reliable');
+    },
+  },
+  {
+    name: 'guided pathway still refuses a reliable answer when evidence is too generic',
+    run() {
+      const results = getMatches('', '', 2, age(30, 'years'), {
+        selectedSymptoms: ['fever'],
+        selectedSigns: [],
+        preferredConditionIds: [
+          'uncomplicated-malaria',
+          'severe-malaria',
+          'typhoid-fever',
+          'meningitis',
+          'measles',
+          'sick-newborn-sepsis',
+        ],
+      });
+      assert.ok(results.length === 0 || results[0].confidenceGateStatus !== 'reliable');
+    },
+  },
+  {
     name: 'sign-heavy vitamin A deficiency eye findings return the curated condition',
     run() {
       const results = getMatches('poor night vision', 'dry conjunctiva, grey sclera, conjunctival folding', 2, age(2, 'months'));
@@ -207,6 +245,61 @@ const cases = [
     run() {
       const results = getMatches('', 'dry conjunctiva, grey sclera, conjunctival folding', 2, age(2, 'months'));
       assert.equal(results[0]?.condition.id, 'vitamin-a-deficiency-eye-disease');
+    },
+  },
+  {
+    name: 'adult GORD symptoms rank GORD above other upper GI conditions',
+    run() {
+      const results = getMatches('heartburn, nocturnal regurgitation, epigastric pain', '', 14, age(30, 'years'));
+      assert.equal(results[0]?.condition.id, 'gastro-oesophageal-reflux-disease');
+      assert.ok(results[0]?.score > (results[1]?.score ?? 0));
+    },
+  },
+  {
+    name: 'epigastric pain with tenderness ranks peptic ulcer disease',
+    run() {
+      const results = getMatches('epigastric pain, burning epigastric pain, vomiting', 'epigastric tenderness', 14, age(30, 'years'));
+      assert.equal(results[0]?.condition.id, 'peptic-ulcer-disease');
+    },
+  },
+  {
+    name: 'constipation symptoms surface constipation',
+    run() {
+      const results = getMatches(
+        'passing hard stools, straining to pass stools, feeling of incomplete evacuation of bowel',
+        '',
+        7,
+        age(30, 'years')
+      );
+      assert.equal(results[0]?.condition.id, 'constipation');
+    },
+  },
+  {
+    name: 'bright red rectal bleeding and anal swelling surface haemorrhoids',
+    run() {
+      const results = getMatches('bright red rectal bleeding, anal swelling', 'skin tags', 7, age(30, 'years'));
+      assert.equal(results[0]?.condition.id, 'haemorrhoids');
+    },
+  },
+  {
+    name: 'right upper abdominal pain with fever and tender liver surfaces amoebic liver abscess',
+    run() {
+      const results = getMatches('right upper abdominal pain, fever, malaise', 'large tender liver', 7, age(30, 'years'));
+      assert.equal(results[0]?.condition.id, 'amoebic-liver-abscess');
+    },
+  },
+  {
+    name: 'jaundice with dark urine and right hypochondrial tenderness surfaces acute hepatitis',
+    run() {
+      const results = getMatches('dark urine, pale stools, malaise', 'jaundice, right hypochondrial tenderness', 7, age(30, 'years'));
+      assert.equal(results[0]?.condition.id, 'acute-hepatitis');
+    },
+  },
+  {
+    name: 'confusion with jaundice and asterixis surfaces hepatic encephalopathy',
+    run() {
+      const results = getMatches('jaundice, confusion', 'asterixis, fetor hepaticus', 3, age(30, 'years'));
+      assert.equal(results[0]?.condition.id, 'hepatic-encephalopathy');
     },
   },
   {
@@ -258,9 +351,10 @@ const cases = [
   {
     name: 'generated corpus search contributes broader STG sections for non-curated topics',
     run() {
-      const results = searchDiseases('haemorrhoids');
-      assert.equal(results[0]?.entry.title, 'Haemorrhoids');
+      const results = searchDiseases('acute epiglottitis');
+      assert.equal(results[0]?.entry.title, 'Acute Epiglottitis');
       assert.equal(results[0]?.entry.sourceType, 'generated');
+      assert.equal(results[0]?.entry.triageMode, 'reference_only');
     },
   },
   {
@@ -276,6 +370,7 @@ const cases = [
     run() {
       const results = searchDiseases('gord');
       assert.equal(results[0]?.entry.title, 'Gastro-oesophageal Reflux Disease');
+      assert.ok(['alias', 'exact'].includes(results[0]?.matchStrength));
     },
   },
   {
@@ -299,8 +394,8 @@ const cases = [
   {
     name: 'generated-only condition search still returns STG entry details',
     run() {
-      const results = searchDiseases('constipation');
-      assert.equal(results[0]?.entry.title, 'Constipation');
+      const results = searchDiseases('stroke');
+      assert.equal(results[0]?.entry.title, 'Stroke');
       assert.equal(results[0]?.entry.sourceType, 'generated');
     },
   },
@@ -322,7 +417,7 @@ const cases = [
     name: 'search aliases cover corrected clinical spellings for STG typos',
     run() {
       const results = searchDiseases('amoebic liver abscess');
-      assert.equal(results[0]?.entry.title, 'Amoebic Liver Access');
+      assert.equal(results[0]?.entry.id, 'amoebic-liver-abscess');
     },
   },
   {
@@ -337,6 +432,67 @@ const cases = [
       const entry = getSearchEntryById('meningitis');
       const band = getApplicableAgeBand(entry, age(6, 'months'));
       assert.equal(band?.id, 'infant');
+    },
+  },
+  {
+    name: 'diarrhoea reference entry now exposes aligned STG symptoms from the correct section',
+    run() {
+      const entry = generatedCorpus.find((item) => item.id === 'diarrhoea');
+      assert.ok(entry);
+      assert.ok(entry.symptoms.includes('Frequent watery stools'));
+      assert.ok(entry.symptoms.includes('Associated vomiting'));
+      assert.ok(entry.pdfPages.startsWith('29-'));
+    },
+  },
+  {
+    name: 'haemorrhoids reference entry exposes the expected bleeding and anal symptoms',
+    run() {
+      const entry = generatedCorpus.find((item) => item.id === 'haemorrhoids');
+      assert.ok(entry);
+      assert.ok(entry.symptoms.includes('Passage of bright red blood at defaecation'));
+      assert.ok(entry.signs.includes('Pallor'));
+      assert.ok(
+        entry.diagnosticNotes[0]?.toLowerCase().includes('anal bleeding') ||
+          entry.diagnosticNotes[0]?.toLowerCase().includes('haemorrhoids')
+      );
+    },
+  },
+  {
+    name: 'amoebic liver abscess reference entry exposes liver abscess features instead of diarrhoeal carry-over',
+    run() {
+      const entry = generatedCorpus.find((item) => item.id === 'amoebic-liver-access');
+      assert.ok(entry);
+      assert.ok(
+        entry.symptoms.some((item) => item.toLowerCase().includes('right upper abdominal pain'))
+      );
+      assert.ok(entry.signs.some((item) => item.toLowerCase().includes('large tender liver')));
+    },
+  },
+  {
+    name: 'all searchable STG entries now carry chapter and triage metadata',
+    run() {
+      assert.ok(searchableStgEntries.length >= 260);
+      for (const entry of searchableStgEntries) {
+        assert.ok(Number.isInteger(entry.chapterIndex) && entry.chapterIndex >= 1 && entry.chapterIndex <= 30);
+        assert.ok(entry.chapterTitle.length > 0);
+        assert.ok(['ranked', 'reference_only', 'excluded'].includes(entry.triageMode));
+        assert.ok(entry.triageReason.length > 0);
+      }
+    },
+  },
+  {
+    name: 'chapter summaries cover all 30 STG chapters and are fully classified',
+    run() {
+      assert.equal(stgChapterSummaries.length, 30);
+      assert.ok(stgChapterSummaries.every((chapter) => chapter.isComplete));
+      assert.ok(stgChapterSummaries.every((chapter) => chapter.totalSections > 0));
+      assert.ok(
+        stgChapterSummaries.some(
+          (chapter) =>
+            chapter.title === 'Disorders of the Gastrointestinal Tract' &&
+            chapter.rankedSections >= 4
+        )
+      );
     },
   },
   {
