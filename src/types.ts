@@ -1,5 +1,30 @@
 export type AgeUnit = 'days' | 'months' | 'years';
 
+export type TriageMode = 'ranked' | 'reference_only' | 'excluded';
+
+export type TriageBucketId =
+  | 'fever-systemic'
+  | 'respiratory'
+  | 'diarrhoea-dehydration'
+  | 'urinary'
+  | 'neurologic-meningeal'
+  | 'eye-nutrition'
+  | 'gastrointestinal-bowel'
+  | 'hepatobiliary';
+
+export type StgChapter = {
+  index: number;
+  title: string;
+};
+
+export type StgChapterSummary = StgChapter & {
+  totalSections: number;
+  rankedSections: number;
+  referenceOnlySections: number;
+  excludedSections: number;
+  isComplete: boolean;
+};
+
 export type DurationWindow = {
   minDays: number;
   maxDays: number;
@@ -56,6 +81,10 @@ export type GuidelineCondition = {
   title: string;
   category: string;
   dataSource?: 'curated' | 'generated';
+  chapterIndex: number;
+  chapterTitle: string;
+  triageBucketId: TriageBucketId;
+  sourceEntryId: string;
   ageSensitive: boolean;
   preferredAgeBands?: string[];
   duration?: DurationWindow;
@@ -76,6 +105,15 @@ export type MatchResult = {
   confidenceLabel: 'High' | 'Moderate' | 'Low';
   evidenceQuality: 'specific' | 'mixed' | 'generic';
   needsHallmarkFindings: boolean;
+  structuredEvidenceHits: number;
+  confidenceGateStatus: 'reliable' | 'needs-more-evidence' | 'hallmark-missing';
+  allowAlternatives: boolean;
+};
+
+export type GuidedTriageContext = {
+  selectedSymptoms?: string[];
+  selectedSigns?: string[];
+  preferredConditionIds?: string[];
 };
 
 export type SearchableAgeBand = {
@@ -103,6 +141,10 @@ export type SearchableStgEntry = {
   title: string;
   category: string;
   sourceType: 'curated' | 'generated';
+  chapterIndex: number;
+  chapterTitle: string;
+  triageMode: TriageMode;
+  triageReason: string;
   pdfPages: string;
   aliases: string[];
   normalizedTitle: string;

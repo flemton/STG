@@ -11,115 +11,26 @@ import {
 } from 'react-native';
 
 import {
-  generatedCorpusCount,
-  guidelineConditions,
   signVocabulary,
   symptomVocabulary,
 } from './src/data/conditions';
+import { triageBuckets, TriageBucket } from './src/data/triageBuckets';
 import { getClinicalSuggestions, replaceLastClinicalFragment } from './src/lib/clinical-input';
 import {
   detectEmergencySignals,
   formatAgeToNormalized,
   formatDurationToDays,
   getMatches,
-  getRelatedSections,
 } from './src/lib/matcher';
 import { getApplicableAgeBand, searchDiseases } from './src/lib/search';
-import { AgeUnit, DiseaseSearchResult, MatchResult, SearchableAgeBand, SearchableStgEntry } from './src/types';
-
-const quickSymptoms = [
-  'Fever',
-  'Poor feeding',
-  'Vomiting',
-  'Cough',
-  'Breathlessness',
-  'Wheeze',
-  'Diarrhoea',
-  'Headache',
-  'Painful urination',
-  'Frequent urination',
-  'Yellow eyes',
-  'Poor night vision',
-];
-
-const quickSigns = [
-  'Neck stiffness',
-  'Photophobia',
-  'Sunken eyes',
-  'Chest indrawing',
-  'Dark urine',
-  'Pallor',
-  'Bulging fontanelle',
-  'Convulsions',
-  'Dry conjunctiva',
-  'Grey sclera',
-  'Conjunctival folding',
-  'Keratomalacia',
-];
+import { AgeUnit, DiseaseSearchResult, GuidedTriageContext, SearchableAgeBand, SearchableStgEntry } from './src/types';
 
 const durationUnits = ['days', 'weeks', 'months'] as const;
 const ageUnits: AgeUnit[] = ['days', 'months', 'years'];
 const modes = [
-  { id: 'triage', label: 'Triage by symptoms/signs' },
-  { id: 'search', label: 'Search by disease name' },
+  { id: 'triage', label: 'Guided triage' },
+  { id: 'search', label: 'STG reference' },
 ] as const;
-
-const exampleCases = [
-  {
-    label: 'Neonate sepsis',
-    symptoms: 'poor feeding, weak cry, fever',
-    signs: 'difficulty breathing',
-    ageValue: '7',
-    ageUnit: 'days' as const,
-    duration: '1',
-    durationUnit: 'days' as const,
-  },
-  {
-    label: 'Infant meningitis',
-    symptoms: 'fever, poor sucking, vomiting',
-    signs: 'bulging fontanelle',
-    ageValue: '6',
-    ageUnit: 'months' as const,
-    duration: '2',
-    durationUnit: 'days' as const,
-  },
-  {
-    label: 'Child pneumonia',
-    symptoms: 'fever, cough',
-    signs: 'rapid breathing, chest indrawing',
-    ageValue: '3',
-    ageUnit: 'years' as const,
-    duration: '3',
-    durationUnit: 'days' as const,
-  },
-  {
-    label: 'Adult malaria',
-    symptoms: 'fever, chills, rigors, headache, body pains, vomiting',
-    signs: '',
-    ageValue: '25',
-    ageUnit: 'years' as const,
-    duration: '3',
-    durationUnit: 'days' as const,
-  },
-  {
-    label: 'Child dehydration',
-    symptoms: 'diarrhoea, vomiting, thirst',
-    signs: 'sunken eyes, poor drinking',
-    ageValue: '2',
-    ageUnit: 'years' as const,
-    duration: '2',
-    durationUnit: 'days' as const,
-  },
-  {
-    label: 'Vitamin A eye signs',
-    symptoms: 'poor night vision',
-    signs: 'dry conjunctiva, grey sclera, conjunctival folding',
-    ageValue: '2',
-    ageUnit: 'months' as const,
-    duration: '14',
-    durationUnit: 'days' as const,
-  },
-];
 
 function LogoMark() {
   return (
@@ -310,6 +221,8 @@ function SearchDetail({
 }) {
   const applicableAgeBand = getApplicableAgeBand(entry, age);
   const remainingAgeBands = entry.ageBands.filter((band) => band.id !== applicableAgeBand?.id);
+  const sourceLabel =
+    entry.triageMode === 'ranked' ? 'Ranked by guided triage' : 'Reference-only STG section';
 
   return (
     <View style={styles.card}>
@@ -318,9 +231,46 @@ function SearchDetail({
           <Text style={styles.cardTitle}>{entry.title}</Text>
           <Text style={styles.cardCategory}>{entry.category}</Text>
         </View>
-        <View style={styles.detailPageBadge}>
-          <Text style={styles.detailPageText}>PDF {entry.pdfPages}</Text>
+        <View style={styles.searchDetailBadges}>
+          <View
+            style={[
+              styles.referenceTypeBadge,
+              entry.triageMode === 'ranked' ? styles.curatedTypeBadge : styles.referenceTypeMutedBadge,
+            ]}
+          >
+            <Text
+              style={[
+                styles.referenceTypeText,
+                entry.triageMode === 'ranked'
+                  ? styles.curatedTypeText
+                  : styles.referenceTypeMutedText,
+              ]}
+            >
+              {sourceLabel}
+            </Text>
+          </View>
+          <View style={styles.detailPageBadge}>
+            <Text style={styles.detailPageText}>PDF {entry.pdfPages}</Text>
+          </View>
         </View>
+      </View>
+
+      <Text style={styles.helperText}>
+        {entry.triageMode === 'ranked'
+          ? 'This section is part of the curated guided triage layer, so it can be ranked and read directly here.'
+          : 'This section stays in the wider STG reference corpus. It is searchable and readable here, but it is not used as a ranked triage answer.'}
+      </Text>
+
+      <View style={styles.metaRow}>
+        <Text style={styles.metaLabel}>STG chapter</Text>
+        <Text style={styles.metaValue}>
+          Chapter {entry.chapterIndex}: {entry.chapterTitle}
+        </Text>
+      </View>
+
+      <View style={styles.metaRow}>
+        <Text style={styles.metaLabel}>Triage status</Text>
+        <Text style={styles.metaValue}>{entry.triageReason}</Text>
       </View>
 
       {!!entry.aliases.length && (
@@ -386,6 +336,11 @@ function SearchDetail({
 
 export default function App() {
   const [mode, setMode] = useState<(typeof modes)[number]['id']>('triage');
+  const [selectedBucketId, setSelectedBucketId] = useState<TriageBucket['id'] | null>(null);
+  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+  const [selectedSigns, setSelectedSigns] = useState<string[]>([]);
+  const [showManualSymptoms, setShowManualSymptoms] = useState(false);
+  const [showManualSigns, setShowManualSigns] = useState(false);
   const [symptomText, setSymptomText] = useState('');
   const [signText, setSignText] = useState('');
   const [diseaseQuery, setDiseaseQuery] = useState('');
@@ -401,6 +356,18 @@ export default function App() {
   const debouncedSymptomText = useDebouncedValue(symptomText, 160);
   const debouncedSignText = useDebouncedValue(signText, 160);
   const debouncedDiseaseQuery = useDebouncedValue(diseaseQuery, 180);
+  const activeBucket = useMemo(
+    () => triageBuckets.find((bucket) => bucket.id === selectedBucketId) ?? null,
+    [selectedBucketId]
+  );
+  const guidedContext = useMemo<GuidedTriageContext>(
+    () => ({
+      selectedSymptoms,
+      selectedSigns,
+      preferredConditionIds: activeBucket?.preferredConditionIds ?? [],
+    }),
+    [activeBucket, selectedSigns, selectedSymptoms]
+  );
   const age = useMemo(() => formatAgeToNormalized(ageValue, ageUnit), [ageUnit, ageValue]);
   const durationDays = useMemo(
     () => formatDurationToDays(durationValue, durationUnit),
@@ -408,46 +375,75 @@ export default function App() {
   );
   const symptomSuggestions = useMemo(
     () =>
-      getClinicalSuggestions(deferredSymptomText, symptomVocabulary, 6, {
-        allowFuzzy: deferredSymptomText.trim() === debouncedSymptomText.trim(),
-      })
-        .filter((entry) => entry.reason !== 'exact')
-        .slice(0, 6),
-    [debouncedSymptomText, deferredSymptomText]
+      showManualSymptoms
+        ? getClinicalSuggestions(deferredSymptomText, symptomVocabulary, 6, {
+            allowFuzzy: deferredSymptomText.trim() === debouncedSymptomText.trim(),
+          })
+            .filter((entry) => entry.reason !== 'exact')
+            .slice(0, 6)
+        : [],
+    [debouncedSymptomText, deferredSymptomText, showManualSymptoms]
   );
   const signSuggestions = useMemo(
     () =>
-      getClinicalSuggestions(deferredSignText, signVocabulary, 6, {
-        allowFuzzy: deferredSignText.trim() === debouncedSignText.trim(),
-      })
-        .filter((entry) => entry.reason !== 'exact')
-        .slice(0, 6),
-    [debouncedSignText, deferredSignText]
+      showManualSigns
+        ? getClinicalSuggestions(deferredSignText, signVocabulary, 6, {
+            allowFuzzy: deferredSignText.trim() === debouncedSignText.trim(),
+          })
+            .filter((entry) => entry.reason !== 'exact')
+            .slice(0, 6)
+        : [],
+    [debouncedSignText, deferredSignText, showManualSigns]
   );
 
   const triageResults = useMemo(
-    () => getMatches(deferredSymptomText, deferredSignText, durationDays, age),
-    [age, deferredSignText, deferredSymptomText, durationDays]
-  );
-  const emergencySignals = useMemo(() => detectEmergencySignals(triageResults), [triageResults]);
-  const relatedSections = useMemo(
-    () => getRelatedSections(deferredSymptomText, deferredSignText),
-    [deferredSignText, deferredSymptomText]
-  );
-  const likelyMatches = useMemo(
     () =>
-      triageResults.filter(
-        (result) => !result.needsHallmarkFindings && result.confidenceLabel !== 'Low'
+      getMatches(
+        showManualSymptoms ? deferredSymptomText : '',
+        showManualSigns ? deferredSignText : '',
+        durationDays,
+        age,
+        guidedContext
       ),
-    [triageResults]
+    [
+      age,
+      deferredSignText,
+      deferredSymptomText,
+      durationDays,
+      guidedContext,
+      showManualSigns,
+      showManualSymptoms,
+    ]
   );
-  const reviewMatches = useMemo(
-    () =>
-      triageResults.filter(
-        (result) => result.needsHallmarkFindings || result.confidenceLabel === 'Low'
-      ),
-    [triageResults]
+  const primaryResult = triageResults[0] ?? null;
+  const alternatives = useMemo(() => {
+    if (!primaryResult || !primaryResult.allowAlternatives) {
+      return [];
+    }
+
+    return triageResults
+      .slice(1)
+      .filter(
+        (result) =>
+          result.allowAlternatives &&
+          result.confidenceGateStatus === 'reliable' &&
+          result.score >= primaryResult.score - 1.35
+      )
+      .slice(0, 2);
+  }, [primaryResult, triageResults]);
+  const emergencySignals = useMemo(
+    () => (primaryResult ? detectEmergencySignals([primaryResult]) : []),
+    [primaryResult]
   );
+  const triageHasInputs =
+    selectedSymptoms.length > 0 ||
+    selectedSigns.length > 0 ||
+    Boolean(symptomText.trim()) ||
+    Boolean(signText.trim());
+  const triageNeedsMoreEvidence =
+    Boolean(primaryResult) && primaryResult.confidenceGateStatus !== 'reliable';
+  const triageCanShowResult = Boolean(primaryResult) && !triageNeedsMoreEvidence;
+  const manualHelperVisible = showManualSymptoms || showManualSigns;
 
   const searchResults = useMemo(
     () =>
@@ -477,36 +473,35 @@ export default function App() {
     return searchResults[0]?.entry ?? null;
   }, [searchResults, selectedSearchId]);
 
-  const toggleQuickToken = (
-    value: string,
-    currentValue: string,
-    setter: (next: string) => void
-  ) => {
-    const tokens = currentValue
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
-
-    const exists = tokens.some((token) => token.toLowerCase() === value.toLowerCase());
-    const next = exists
-      ? tokens.filter((token) => token.toLowerCase() !== value.toLowerCase())
-      : [...tokens, value];
-
-    const normalized = next.join(', ');
-    setter(!exists && normalized ? `${normalized}, ` : normalized);
+  const selectBucket = (bucketId: TriageBucket['id']) => {
+    setSelectedBucketId(bucketId);
+    setSelectedSymptoms([]);
+    setSelectedSigns([]);
+    setSymptomText('');
+    setSignText('');
+    setShowManualSymptoms(false);
+    setShowManualSigns(false);
   };
 
-  const loadExample = (example: (typeof exampleCases)[number]) => {
-    setMode('triage');
-    setSymptomText(example.symptoms);
-    setSignText(example.signs);
-    setAgeValue(example.ageValue);
-    setAgeUnit(example.ageUnit);
-    setDurationValue(example.duration);
-    setDurationUnit(example.durationUnit);
+  const toggleStructuredTerm = (
+    value: string,
+    currentValues: string[],
+    setter: (next: string[]) => void
+  ) => {
+    const exists = currentValues.some((item) => item.toLowerCase() === value.toLowerCase());
+    setter(
+      exists
+        ? currentValues.filter((item) => item.toLowerCase() !== value.toLowerCase())
+        : [...currentValues, value]
+    );
   };
 
   const clearTriageInputs = () => {
+    setSelectedBucketId(null);
+    setSelectedSymptoms([]);
+    setSelectedSigns([]);
+    setShowManualSymptoms(false);
+    setShowManualSigns(false);
     setSymptomText('');
     setSignText('');
     setAgeValue('');
@@ -528,27 +523,27 @@ export default function App() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.hero}>
-          <View style={styles.heroTopRow}>
+        <View style={styles.compactIntro}>
+          <View style={styles.compactIntroTop}>
             <LogoMark />
-            <View style={styles.heroCopy}>
-              <Text style={styles.kicker}>Offline STG Triage</Text>
-              <Text style={styles.title}>Triage and disease lookup from the Ghana STG</Text>
-              <Text style={styles.subtitle}>
-                Switch between age-aware triage by symptoms/signs and direct disease-name search for
-                fast STG confirmation.
+            <View style={styles.compactIntroCopy}>
+              <Text style={styles.kicker}>Offline Ghana STG 2017</Text>
+              <Text style={styles.compactIntroTitle}>Simpler guided triage first</Text>
+              <Text style={styles.compactIntroText}>
+                Use guided triage when you need one careful STG answer, then switch to STG reference
+                when you already know the condition and want the section content.
               </Text>
             </View>
           </View>
-          <View style={styles.heroBadgeRow}>
+          <View style={styles.compactIntroBadges}>
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>Triage-first</Text>
+            </View>
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>Reference lookup</Text>
+            </View>
             <View style={styles.heroBadge}>
               <Text style={styles.heroBadgeText}>Offline-only</Text>
-            </View>
-            <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>Disease search</Text>
-            </View>
-            <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>Ghana STG based</Text>
             </View>
           </View>
         </View>
@@ -570,119 +565,46 @@ export default function App() {
           })}
         </View>
 
-        <View style={styles.panel}>
-          <Text style={styles.label}>Patient age</Text>
-          <View style={styles.durationRow}>
-            <TextInput
-              value={ageValue}
-              onChangeText={setAgeValue}
-              keyboardType="numeric"
-              style={styles.durationInput}
-              placeholder="e.g. 40"
-              placeholderTextColor="#7e7a72"
-            />
-            <View style={styles.segmented}>
-              {ageUnits.map((unit) => {
-                const active = ageUnit === unit;
-                return (
-                  <Pressable
-                    key={unit}
-                    onPress={() => setAgeUnit(unit)}
-                    style={[styles.segment, active && styles.segmentActive]}
-                  >
-                    <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{unit}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-          <Text style={styles.helperText}>
-            {mode === 'triage'
-              ? 'Age is required for triage because symptoms, signs, and treatment differ across age groups in the STG.'
-              : 'Age is optional in disease search. If you add it, the app highlights the most relevant age-specific guidance.'}
-          </Text>
-          {ageIsRequired && <Text style={styles.validationText}>Enter a valid age greater than zero.</Text>}
-          {ageInvalidButOptional && (
-            <Text style={styles.validationText}>
-              Enter a valid age if you want age-specific search highlighting.
-            </Text>
-          )}
-        </View>
-
         {mode === 'triage' ? (
           <>
             <View style={styles.panel}>
-              <Text style={styles.label}>Symptoms</Text>
-              <TextInput
-                multiline
-                value={symptomText}
-                onChangeText={setSymptomText}
-                placeholder="e.g. fever, poor feeding, vomiting"
-                placeholderTextColor="#7e7a72"
-                style={styles.textArea}
-              />
+              <Text style={styles.stepLabel}>Step 1</Text>
+              <Text style={styles.sectionTitle}>Age and duration</Text>
               <Text style={styles.helperText}>
-                Symptoms are patient-reported or caregiver-reported complaints. Separate items with commas.
+                Guided triage stays age-aware and duration-aware because the STG changes both
+                diagnostic meaning and treatment by age group and timeline.
               </Text>
-              <SuggestionStrip
-                title="Suggested STG symptoms"
-                suggestions={symptomSuggestions}
-                onPick={(term) =>
-                  setSymptomText((current) => replaceLastClinicalFragment(current, term))
-                }
-              />
 
-              <Text style={styles.label}>Signs / examination findings</Text>
-              <TextInput
-                multiline
-                value={signText}
-                onChangeText={setSignText}
-                placeholder="e.g. chest indrawing, bulging fontanelle, dry conjunctiva"
-                placeholderTextColor="#7e7a72"
-                style={styles.textArea}
-              />
-              <Text style={styles.helperText}>
-                Signs are clinician-observed or examination findings from the STG. Separate items with commas.
-              </Text>
-              <SuggestionStrip
-                title="Suggested STG signs"
-                suggestions={signSuggestions}
-                onPick={(term) =>
-                  setSignText((current) => replaceLastClinicalFragment(current, term))
-                }
-              />
-
-              <Text style={styles.label}>Quick symptom add</Text>
-              <View style={styles.chips}>
-                {quickSymptoms.map((symptom) => {
-                  const active = symptomText.toLowerCase().includes(symptom.toLowerCase());
-                  return (
-                    <Pressable
-                      key={symptom}
-                      onPress={() => toggleQuickToken(symptom, symptomText, setSymptomText)}
-                      style={[styles.chip, active && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{symptom}</Text>
-                    </Pressable>
-                  );
-                })}
+              <Text style={styles.label}>Patient age</Text>
+              <View style={styles.durationRow}>
+                <TextInput
+                  value={ageValue}
+                  onChangeText={setAgeValue}
+                  keyboardType="numeric"
+                  style={styles.durationInput}
+                  placeholder="e.g. 40"
+                  placeholderTextColor="#7e7a72"
+                />
+                <View style={styles.segmented}>
+                  {ageUnits.map((unit) => {
+                    const active = ageUnit === unit;
+                    return (
+                      <Pressable
+                        key={unit}
+                        onPress={() => setAgeUnit(unit)}
+                        style={[styles.segment, active && styles.segmentActive]}
+                      >
+                        <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                          {unit}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
-
-              <Text style={styles.label}>Quick sign add</Text>
-              <View style={styles.chips}>
-                {quickSigns.map((sign) => {
-                  const active = signText.toLowerCase().includes(sign.toLowerCase());
-                  return (
-                    <Pressable
-                      key={sign}
-                      onPress={() => toggleQuickToken(sign, signText, setSignText)}
-                      style={[styles.chip, active && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{sign}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              {ageIsRequired && (
+                <Text style={styles.validationText}>Enter a valid age greater than zero.</Text>
+              )}
 
               <Text style={styles.label}>Duration of illness</Text>
               <View style={styles.durationRow}>
@@ -703,7 +625,9 @@ export default function App() {
                         onPress={() => setDurationUnit(unit)}
                         style={[styles.segment, active && styles.segmentActive]}
                       >
-                        <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{unit}</Text>
+                        <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                          {unit}
+                        </Text>
                       </Pressable>
                     );
                   })}
@@ -714,270 +638,355 @@ export default function App() {
                   Duration must be a whole number greater than zero.
                 </Text>
               )}
+            </View>
 
-              <Pressable onPress={clearTriageInputs} style={styles.clearAllButton}>
-                <Text style={styles.clearAllButtonText}>Clear all</Text>
-              </Pressable>
-
-              <Text style={styles.label}>Example cases</Text>
-              <View style={styles.examplesRow}>
-                {exampleCases.map((example) => (
-                  <Pressable
-                    key={example.label}
-                    onPress={() => loadExample(example)}
-                    style={styles.exampleCard}
-                  >
-                    <Text style={styles.exampleTitle}>{example.label}</Text>
-                    <Text style={styles.exampleText}>
-                      {example.ageValue} {example.ageUnit} | Sx: {example.symptoms || 'none'} | Signs:{' '}
-                      {example.signs || 'none'}
-                    </Text>
-                  </Pressable>
-                ))}
+            <View style={styles.panel}>
+              <Text style={styles.stepLabel}>Step 2</Text>
+              <Text style={styles.sectionTitle}>Choose the main STG pathway</Text>
+              <Text style={styles.helperText}>
+                Start with the dominant syndrome so the app narrows ranking to the most relevant
+                curated STG conditions instead of guessing broadly.
+              </Text>
+              <View style={styles.bucketGrid}>
+                {triageBuckets.map((bucket) => {
+                  const active = selectedBucketId === bucket.id;
+                  return (
+                    <Pressable
+                      key={bucket.id}
+                      onPress={() => selectBucket(bucket.id)}
+                      style={[styles.bucketCard, active && styles.bucketCardActive]}
+                    >
+                      <Text style={[styles.bucketTitle, active && styles.bucketTitleActive]}>
+                        {bucket.label}
+                      </Text>
+                      <Text style={[styles.bucketHelper, active && styles.bucketHelperActive]}>
+                        {bucket.helperText}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
 
-            <View style={styles.infoStrip}>
-              <Text style={styles.infoHeadline}>Age-aware offline engine</Text>
-              <Text style={styles.infoText}>
-                {guidelineConditions.length} curated high-priority conditions use strict age-aware
-                scoring, and {generatedCorpusCount} additional STG sections are searchable offline
-                for broader review.
-              </Text>
-            </View>
+            {!!activeBucket && (
+              <View style={styles.panel}>
+                <Text style={styles.stepLabel}>Step 3</Text>
+                <Text style={styles.sectionTitle}>Add the most relevant findings</Text>
+                <Text style={styles.helperText}>{activeBucket.helperText}</Text>
 
-            <View style={styles.resultsHeader}>
-              <Text style={styles.resultsTitle}>Possible STG matches</Text>
-              <Text style={styles.resultsCaption}>
-                These are guideline-based suggestions, not a confirmed diagnosis. Hallmark signs and
-                exam findings matter.
-              </Text>
-            </View>
+                <View style={styles.selectionHeader}>
+                  <Text style={styles.label}>Patient-reported symptoms</Text>
+                  <Text style={styles.selectionCount}>{selectedSymptoms.length} selected</Text>
+                </View>
+                <View style={styles.chips}>
+                  {activeBucket.symptomOptions.map((symptom) => {
+                    const active = selectedSymptoms.includes(symptom);
+                    return (
+                      <Pressable
+                        key={symptom}
+                        onPress={() =>
+                          toggleStructuredTerm(symptom, selectedSymptoms, setSelectedSymptoms)
+                        }
+                        style={[styles.chip, active && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                          {symptom}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
 
-            {!!emergencySignals.length && (
-              <View style={styles.globalAlert}>
-                <Text style={styles.globalAlertTitle}>Urgent review suggested</Text>
-                <Text style={styles.globalAlertText}>
-                  The current age-specific pattern includes urgent features: {emergencySignals.join(', ')}.
-                </Text>
+                <View style={styles.selectionHeader}>
+                  <Text style={styles.label}>Observed signs / examination findings</Text>
+                  <Text style={styles.selectionCount}>{selectedSigns.length} selected</Text>
+                </View>
+                <View style={styles.chips}>
+                  {activeBucket.signOptions.map((sign) => {
+                    const active = selectedSigns.includes(sign);
+                    return (
+                      <Pressable
+                        key={sign}
+                        onPress={() => toggleStructuredTerm(sign, selectedSigns, setSelectedSigns)}
+                        style={[styles.chip, active && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                          {sign}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <View style={styles.manualActionsRow}>
+                  <Pressable
+                    onPress={() => setShowManualSymptoms((current) => !current)}
+                    style={[
+                      styles.secondaryButton,
+                      showManualSymptoms && styles.secondaryButtonActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.secondaryButtonText,
+                        showManualSymptoms && styles.secondaryButtonTextActive,
+                      ]}
+                    >
+                      {showManualSymptoms ? 'Hide' : 'Add'} manual symptoms
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setShowManualSigns((current) => !current)}
+                    style={[
+                      styles.secondaryButton,
+                      showManualSigns && styles.secondaryButtonActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.secondaryButtonText,
+                        showManualSigns && styles.secondaryButtonTextActive,
+                      ]}
+                    >
+                      {showManualSigns ? 'Hide' : 'Add'} manual signs
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {manualHelperVisible && (
+                  <Text style={styles.helperText}>
+                    Manual entry is fallback only. Structured STG selections are weighted more
+                    strongly than free text in guided triage.
+                  </Text>
+                )}
+
+                {showManualSymptoms && (
+                  <>
+                    <Text style={styles.label}>Manual symptom entry</Text>
+                    <TextInput
+                      multiline
+                      value={symptomText}
+                      onChangeText={setSymptomText}
+                      placeholder="Optional fallback, e.g. fever, vomiting"
+                      placeholderTextColor="#7e7a72"
+                      style={styles.textArea}
+                    />
+                    <SuggestionStrip
+                      title="Suggested STG symptoms"
+                      suggestions={symptomSuggestions}
+                      onPick={(term) =>
+                        setSymptomText((current) => replaceLastClinicalFragment(current, term))
+                      }
+                    />
+                  </>
+                )}
+
+                {showManualSigns && (
+                  <>
+                    <Text style={styles.label}>Manual sign entry</Text>
+                    <TextInput
+                      multiline
+                      value={signText}
+                      onChangeText={setSignText}
+                      placeholder="Optional fallback, e.g. neck stiffness, sunken eyes"
+                      placeholderTextColor="#7e7a72"
+                      style={styles.textArea}
+                    />
+                    <SuggestionStrip
+                      title="Suggested STG signs"
+                      suggestions={signSuggestions}
+                      onPick={(term) =>
+                        setSignText((current) => replaceLastClinicalFragment(current, term))
+                      }
+                    />
+                  </>
+                )}
+
+                <Pressable onPress={clearTriageInputs} style={styles.clearAllButton}>
+                  <Text style={styles.clearAllButtonText}>Clear guided triage</Text>
+                </Pressable>
               </View>
             )}
 
-            {ageIsRequired ? (
+            {!age ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>Age is required</Text>
                 <Text style={styles.emptyText}>
-                  Add the patient&apos;s exact age in days, months, or years to generate age-aware STG
-                  matches and treatment guidance.
+                  Add the patient&apos;s exact age in days, months, or years before guided triage
+                  can produce an STG answer.
                 </Text>
               </View>
-            ) : triageResults.length ? (
+            ) : !selectedBucketId ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Choose one main clinical pathway</Text>
+                <Text style={styles.emptyText}>
+                  Start with the dominant syndrome so the app can limit ranking to the right
+                  curated STG pathway instead of spreading across everything at once.
+                </Text>
+              </View>
+            ) : !triageHasInputs ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Select findings from the chosen pathway</Text>
+                <Text style={styles.emptyText}>
+                  Choose the most relevant symptoms and signs first. Add manual terms only if the
+                  structured checklist does not cover the case well enough.
+                </Text>
+              </View>
+            ) : triageCanShowResult && primaryResult ? (
               <>
-                {!likelyMatches.length && (
+                <View style={styles.resultsHeader}>
+                  <Text style={styles.resultsTitle}>Most likely STG match</Text>
+                  <Text style={styles.resultsCaption}>
+                    Guided triage now shows one primary answer first. Alternatives appear only when
+                    they remain very close after structured STG weighting.
+                  </Text>
+                </View>
+
+                {!!emergencySignals.length && (
                   <View style={styles.globalAlert}>
-                    <Text style={styles.globalAlertTitle}>More specific findings would help</Text>
+                    <Text style={styles.globalAlertTitle}>Urgent review suggested</Text>
                     <Text style={styles.globalAlertText}>
-                      These findings are still non-specific in the STG. Add exam signs such as neck
-                      stiffness, chest indrawing, sunken eyes, pallor, photophobia, bulging fontanelle,
-                      or altered consciousness for a higher-confidence ranking.
+                      The current age-specific pattern includes urgent features: {emergencySignals.join(', ')}.
                     </Text>
                   </View>
                 )}
 
-                {!!likelyMatches.length && (
-                  <View style={styles.resultsHeader}>
-                    <Text style={styles.resultsTitle}>Likely matches</Text>
-                    <Text style={styles.resultsCaption}>
-                      Higher-confidence STG matches based on the current evidence.
+                <View style={styles.card}>
+                  <View style={styles.cardTopRow}>
+                    <View style={styles.primaryMatchBadge}>
+                      <Text style={styles.primaryMatchBadgeText}>Primary</Text>
+                    </View>
+                    <View style={styles.cardTitleWrap}>
+                      <Text style={styles.cardTitle}>{primaryResult.condition.title}</Text>
+                      <Text style={styles.cardCategory}>{primaryResult.condition.category}</Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.confidenceBadge,
+                        primaryResult.confidenceLabel === 'High'
+                          ? styles.highBadge
+                          : styles.moderateBadge,
+                      ]}
+                    >
+                      <Text style={styles.confidenceText}>{primaryResult.confidenceLabel}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.cardSummary}>{primaryResult.ageBand.summary}</Text>
+
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Why this matches</Text>
+                    <Text style={styles.metaValue}>
+                      Symptoms: {primaryResult.matchedSymptoms.length ? primaryResult.matchedSymptoms.join(', ') : 'limited overlap'}{'\n'}
+                      Signs: {primaryResult.matchedSigns.length ? primaryResult.matchedSigns.join(', ') : 'limited overlap'}
                     </Text>
                   </View>
-                )}
 
-                {[...likelyMatches, ...reviewMatches].map((result: MatchResult, index: number) => (
-                  <View key={`${result.condition.id}-${result.ageBand.id}`} style={styles.card}>
-                    <View style={styles.cardTopRow}>
-                      <View style={styles.rankBubble}>
-                        <Text style={styles.rankText}>{index + 1}</Text>
-                      </View>
-                      <View style={styles.cardTitleWrap}>
-                        <Text style={styles.cardTitle}>{result.condition.title}</Text>
-                        <Text style={styles.cardCategory}>{result.condition.category}</Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.confidenceBadge,
-                          result.confidenceLabel === 'High'
-                            ? styles.highBadge
-                            : result.confidenceLabel === 'Moderate'
-                              ? styles.moderateBadge
-                              : styles.lowBadge,
-                        ]}
-                      >
-                        <Text style={styles.confidenceText}>{result.confidenceLabel}</Text>
-                      </View>
-                    </View>
-
-                    <Text style={styles.cardSummary}>{result.ageBand.summary}</Text>
-
-                    <View style={styles.metaRow}>
-                      <Text style={styles.metaLabel}>Matched age group</Text>
-                      <Text style={styles.metaValue}>{result.ageBand.label}</Text>
-                    </View>
-
-                    <View style={styles.metaRow}>
-                      <Text style={styles.metaLabel}>Treatment shown for</Text>
-                      <Text style={styles.metaValue}>{result.ageBand.label}</Text>
-                    </View>
-
-                    <View style={styles.metaRow}>
-                      <Text style={styles.metaLabel}>Matched symptoms</Text>
-                      <Text style={styles.metaValue}>
-                        {result.matchedSymptoms.length
-                          ? result.matchedSymptoms.join(', ')
-                          : 'limited overlap'}
-                      </Text>
-                    </View>
-
-                    <View style={styles.metaRow}>
-                      <Text style={styles.metaLabel}>Matched signs</Text>
-                      <Text style={styles.metaValue}>
-                        {result.matchedSigns.length ? result.matchedSigns.join(', ') : 'none yet'}
-                      </Text>
-                    </View>
-
-                    <View style={styles.metaRow}>
-                      <Text style={styles.metaLabel}>Evidence quality</Text>
-                      <Text style={styles.metaValue}>
-                        {result.evidenceQuality}
-                        {result.needsHallmarkFindings ? ' | needs hallmark findings' : ''}
-                      </Text>
-                    </View>
-
-                    {!!result.missingHallmarks.length && (
-                      <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Hallmarks still missing</Text>
-                        <Text style={styles.metaValue}>{result.missingHallmarks.join(', ')}</Text>
-                      </View>
-                    )}
-
-                    <View style={styles.metaRow}>
-                      <Text style={styles.metaLabel}>Duration fit</Text>
-                      <Text style={styles.metaValue}>
-                        {result.durationFit}
-                        {result.condition.duration ? ` (${result.condition.duration.label})` : ''}
-                      </Text>
-                    </View>
-
-                    {!!result.ageBand.evidence.investigations.length && (
-                      <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Useful next checks</Text>
-                        <Text style={styles.metaValue}>
-                          {result.suggestedInvestigations.join(', ')}
-                        </Text>
-                      </View>
-                    )}
-
-                    {!!result.ageBand.evidence.redFlags.length && (
-                      <View style={styles.alertBox}>
-                        <Text style={styles.alertTitle}>
-                          Urgent features to watch in this age group
-                        </Text>
-                        <Text style={styles.alertText}>
-                          {result.ageBand.evidence.redFlags.join(', ')}
-                        </Text>
-                      </View>
-                    )}
-
-                    <Text style={styles.sectionTitle}>STG treatment options</Text>
-                    {result.ageBand.treatment.map((item) => (
-                      <View key={item.title} style={styles.treatmentRow}>
-                        <Text style={styles.treatmentTitle}>{item.title}</Text>
-                        <Text style={styles.treatmentText}>{item.details}</Text>
-                      </View>
-                    ))}
-
-                    {!!result.ageBand.contraindicationsOrNotes?.length && (
-                      <>
-                        <Text style={styles.sectionTitle}>Age-specific notes</Text>
-                        {result.ageBand.contraindicationsOrNotes.map((note) => (
-                          <Text key={note} style={styles.noteText}>
-                            - {note}
-                          </Text>
-                        ))}
-                      </>
-                    )}
-
-                    {!!result.ageBand.source && (
-                      <Text style={styles.sourceText}>
-                        Source: {result.ageBand.source.section} | PDF pages {result.ageBand.source.pdfPages}
-                      </Text>
-                    )}
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Matched age group</Text>
+                    <Text style={styles.metaValue}>{primaryResult.ageBand.label}</Text>
                   </View>
-                ))}
 
-                {!!relatedSections.length && (
-                  <>
-                    <View style={styles.resultsHeader}>
-                      <Text style={styles.resultsTitle}>Other STG sections to review</Text>
-                      <Text style={styles.resultsCaption}>
-                        Broader offline matches from the extracted STG corpus. Use these when the
-                        likely-match list is thin or you want to scan related guideline sections.
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Key findings still missing</Text>
+                    <Text style={styles.metaValue}>
+                      {primaryResult.missingHallmarks.length
+                        ? primaryResult.missingHallmarks.join(', ')
+                        : 'none highlighted'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Useful next checks</Text>
+                    <Text style={styles.metaValue}>
+                      {primaryResult.suggestedInvestigations.length
+                        ? primaryResult.suggestedInvestigations.join(', ')
+                        : 'none listed'}
+                    </Text>
+                  </View>
+
+                  {!!primaryResult.ageBand.evidence.redFlags.length && (
+                    <View style={styles.alertBox}>
+                      <Text style={styles.alertTitle}>Urgent features to watch</Text>
+                      <Text style={styles.alertText}>
+                        {primaryResult.ageBand.evidence.redFlags.join(', ')}
                       </Text>
                     </View>
+                  )}
 
-                    {relatedSections.map((section) => (
-                      <View key={section.id} style={styles.card}>
-                        <Text style={styles.cardTitle}>{section.title}</Text>
-                        <Text style={styles.cardCategory}>{section.category}</Text>
+                  <Text style={styles.sectionTitle}>Age-specific treatment</Text>
+                  {primaryResult.ageBand.treatment.map((item) => (
+                    <View key={item.title} style={styles.treatmentRow}>
+                      <Text style={styles.treatmentTitle}>{item.title}</Text>
+                      <Text style={styles.treatmentText}>{item.details}</Text>
+                    </View>
+                  ))}
 
-                        <View style={styles.metaRow}>
-                          <Text style={styles.metaLabel}>Matched symptoms</Text>
-                          <Text style={styles.metaValue}>
-                            {section.matchedSymptoms.length
-                              ? section.matchedSymptoms.join(', ')
-                              : 'none'}
-                          </Text>
-                        </View>
-
-                        <View style={styles.metaRow}>
-                          <Text style={styles.metaLabel}>Matched signs</Text>
-                          <Text style={styles.metaValue}>
-                            {section.matchedSigns.length ? section.matchedSigns.join(', ') : 'none'}
-                          </Text>
-                        </View>
-
-                        {!!section.investigations.length && (
-                          <View style={styles.metaRow}>
-                            <Text style={styles.metaLabel}>Useful next checks</Text>
-                            <Text style={styles.metaValue}>{section.investigations.join(', ')}</Text>
-                          </View>
-                        )}
-
-                        {!!section.diagnosticNotes.length && (
-                          <Text style={styles.cardSummary}>{section.diagnosticNotes.join(' ')}</Text>
-                        )}
-
-                        <Text style={styles.sourceText}>
-                          Source: {section.title} | PDF pages {section.pdfPages}
+                  {!!primaryResult.ageBand.contraindicationsOrNotes?.length && (
+                    <>
+                      <Text style={styles.sectionTitle}>Notes</Text>
+                      {primaryResult.ageBand.contraindicationsOrNotes.map((note) => (
+                        <Text key={note} style={styles.noteText}>
+                          - {note}
                         </Text>
+                      ))}
+                    </>
+                  )}
+
+                  {!!primaryResult.ageBand.source && (
+                    <Text style={styles.sourceText}>
+                      Source: {primaryResult.ageBand.source.section} | PDF pages{' '}
+                      {primaryResult.ageBand.source.pdfPages}
+                    </Text>
+                  )}
+                </View>
+
+                {!!alternatives.length && (
+                  <View style={styles.panel}>
+                    <Text style={styles.sectionTitle}>Other close STG matches</Text>
+                    <Text style={styles.helperText}>
+                      These remain visible only because their evidence is genuinely close to the
+                      primary answer.
+                    </Text>
+                    {alternatives.map((result) => (
+                      <View key={`${result.condition.id}-${result.ageBand.id}`} style={styles.altResultRow}>
+                        <View style={styles.altResultCopy}>
+                          <Text style={styles.altResultTitle}>{result.condition.title}</Text>
+                          <Text style={styles.altResultText}>
+                            {result.matchedSymptoms.concat(result.matchedSigns).slice(0, 4).join(', ')}
+                          </Text>
+                        </View>
+                        <Text style={styles.altResultBadge}>{result.confidenceLabel}</Text>
                       </View>
                     ))}
-                  </>
+                  </View>
                 )}
               </>
             ) : (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>No age-appropriate matches yet</Text>
+                <Text style={styles.emptyTitle}>Insufficient STG evidence for a reliable answer</Text>
                 <Text style={styles.emptyText}>
-                  Add symptoms or signs with a valid age and duration to generate ranked STG suggestions.
+                  {primaryResult
+                    ? `Current best fit is ${primaryResult.condition.title}, but the evidence is still too weak or too generic. Add more specific signs or hallmark findings from the selected pathway.`
+                    : 'Add more pathway-specific symptoms or signs before the app tries to give a primary STG answer.'}
                 </Text>
+                {!!primaryResult?.missingHallmarks.length && (
+                  <Text style={styles.helperText}>
+                    Most helpful next findings: {primaryResult.missingHallmarks.join(', ')}
+                  </Text>
+                )}
               </View>
             )}
           </>
         ) : (
           <>
             <View style={styles.panel}>
+              <Text style={styles.stepLabel}>Reference</Text>
               <Text style={styles.label}>Search by disease or infection name</Text>
+              <Text style={styles.helperText}>
+                Search is for confirmation and lookup. It searches the wider STG corpus by disease
+                name without trying to rank a diagnosis from free text.
+              </Text>
               <TextInput
                 value={diseaseQuery}
                 onChangeText={(value) => {
@@ -1023,12 +1032,51 @@ export default function App() {
               )}
             </View>
 
+            <View style={styles.panel}>
+              <Text style={styles.label}>Optional age highlight</Text>
+              <View style={styles.durationRow}>
+                <TextInput
+                  value={ageValue}
+                  onChangeText={setAgeValue}
+                  keyboardType="numeric"
+                  style={styles.durationInput}
+                  placeholder="e.g. 2"
+                  placeholderTextColor="#7e7a72"
+                />
+                <View style={styles.segmented}>
+                  {ageUnits.map((unit) => {
+                    const active = ageUnit === unit;
+                    return (
+                      <Pressable
+                        key={unit}
+                        onPress={() => setAgeUnit(unit)}
+                        style={[styles.segment, active && styles.segmentActive]}
+                      >
+                        <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                          {unit}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+              <Text style={styles.helperText}>
+                Age is optional in STG reference. If you add it, the matching age-specific band is
+                highlighted first inside the selected section.
+              </Text>
+              {ageInvalidButOptional && (
+                <Text style={styles.validationText}>
+                  Enter a valid age if you want age-specific search highlighting.
+                </Text>
+              )}
+            </View>
+
             <View style={styles.infoStrip}>
-              <Text style={styles.infoHeadline}>Full STG disease lookup</Text>
+              <Text style={styles.infoHeadline}>Reference mode stays separate from triage</Text>
               <Text style={styles.infoText}>
-                Search across {guidelineConditions.length} curated diagnostic entries and{' '}
-                {generatedCorpusCount} broader STG sections. Search results open the structured
-                guideline content directly in the app.
+                Curated entries are trusted for ranked guided triage. Generated reference-only STG
+                sections remain searchable here for confirmation and reading, but they do not drive
+                the primary triage answer.
               </Text>
             </View>
 
@@ -1087,7 +1135,30 @@ export default function App() {
                           </View>
                         </View>
                         <Text style={styles.helperText}>{result.matchReason}</Text>
-                        <Text style={styles.sourceText}>PDF pages {result.entry.pdfPages}</Text>
+                        <View style={styles.searchMetaRow}>
+                          <View
+                            style={[
+                              styles.referenceTypeBadge,
+                              result.entry.triageMode === 'ranked'
+                                ? styles.curatedTypeBadge
+                                : styles.referenceTypeMutedBadge,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.referenceTypeText,
+                                result.entry.triageMode === 'ranked'
+                                  ? styles.curatedTypeText
+                                  : styles.referenceTypeMutedText,
+                              ]}
+                            >
+                              {result.entry.triageMode === 'ranked'
+                                ? 'Ranked by triage'
+                                : 'Reference only'}
+                            </Text>
+                          </View>
+                          <Text style={styles.sourceText}>PDF pages {result.entry.pdfPages}</Text>
+                        </View>
                       </Pressable>
                     );
                   })
@@ -1129,6 +1200,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 18,
     gap: 16,
+  },
+  compactIntro: {
+    backgroundColor: '#1f4f46',
+    borderRadius: 24,
+    padding: 18,
+    gap: 14,
+  },
+  compactIntroTop: {
+    flexDirection: 'row',
+    gap: 14,
+    alignItems: 'center',
+  },
+  compactIntroCopy: {
+    flex: 1,
+    gap: 6,
+  },
+  compactIntroTitle: {
+    color: '#f7f2e9',
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '800',
+  },
+  compactIntroText: {
+    color: '#d7e8df',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  compactIntroBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   hero: {
     backgroundColor: '#1f4f46',
@@ -1277,6 +1379,13 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 12,
   },
+  stepLabel: {
+    color: '#8b5e34',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
   label: {
     color: '#39332c',
     fontSize: 14,
@@ -1406,9 +1515,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
+  secondaryButtonActive: {
+    backgroundColor: '#1f4f46',
+  },
   secondaryButtonText: {
     color: '#433b33',
     fontWeight: '700',
+  },
+  secondaryButtonTextActive: {
+    color: '#f6f1e8',
   },
   clearAllButton: {
     backgroundColor: '#8b5e34',
@@ -1477,6 +1592,53 @@ const styles = StyleSheet.create({
   },
   segmentTextActive: {
     color: '#fff8f0',
+  },
+  bucketGrid: {
+    gap: 10,
+  },
+  bucketCard: {
+    borderRadius: 18,
+    backgroundColor: '#efe8dc',
+    borderWidth: 1,
+    borderColor: '#e1d6c8',
+    padding: 14,
+    gap: 4,
+  },
+  bucketCardActive: {
+    backgroundColor: '#edf5f1',
+    borderColor: '#1f4f46',
+  },
+  bucketTitle: {
+    color: '#2f281f',
+    fontWeight: '800',
+    fontSize: 15,
+  },
+  bucketTitleActive: {
+    color: '#173e37',
+  },
+  bucketHelper: {
+    color: '#6c6258',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  bucketHelperActive: {
+    color: '#315e56',
+  },
+  selectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    alignItems: 'center',
+  },
+  selectionCount: {
+    color: '#756a5e',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  manualActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   examplesRow: {
     gap: 10,
@@ -1568,6 +1730,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  primaryMatchBadge: {
+    backgroundColor: '#1f4f46',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  primaryMatchBadgeText: {
+    color: '#f6f1e8',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   rankBubble: {
     width: 34,
@@ -1697,10 +1872,21 @@ const styles = StyleSheet.create({
     gap: 12,
     alignItems: 'flex-start',
   },
+  searchMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   searchDetailHeader: {
     flexDirection: 'row',
     gap: 12,
     alignItems: 'flex-start',
+  },
+  searchDetailBadges: {
+    gap: 8,
+    alignItems: 'flex-end',
   },
   detailPageBadge: {
     backgroundColor: '#ece4d7',
@@ -1712,6 +1898,27 @@ const styles = StyleSheet.create({
     color: '#4f473f',
     fontWeight: '700',
     fontSize: 12,
+  },
+  referenceTypeBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  curatedTypeBadge: {
+    backgroundColor: '#d7e8df',
+  },
+  referenceTypeMutedBadge: {
+    backgroundColor: '#efe8dc',
+  },
+  referenceTypeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  curatedTypeText: {
+    color: '#245048',
+  },
+  referenceTypeMutedText: {
+    color: '#6b6258',
   },
   ageBandCard: {
     backgroundColor: '#f8f2e8',
@@ -1747,5 +1954,33 @@ const styles = StyleSheet.create({
     color: '#f6f1e8',
     fontSize: 12,
     fontWeight: '700',
+  },
+  altResultRow: {
+    backgroundColor: '#f6efe4',
+    borderRadius: 18,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  altResultCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  altResultTitle: {
+    color: '#2e271f',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  altResultText: {
+    color: '#655c52',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  altResultBadge: {
+    color: '#6b5133',
+    fontSize: 12,
+    fontWeight: '800',
   },
 });

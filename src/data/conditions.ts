@@ -3,12 +3,16 @@ import {
   ConditionAgeBand,
   DiagnosticEvidence,
   GuidelineCondition,
+  StgChapter,
+  StgChapterSummary,
   SearchableAgeBand,
   SearchableStgEntry,
   TreatmentLine,
+  TriageBucketId,
 } from '../types';
 
 import { generatedCorpus } from './generated-corpus';
+import { getChapterByTitle, getRankedReason, getReferenceReason, stgChapters } from './stgChapters';
 
 const tx = (title: string, details: string): TreatmentLine => ({ title, details });
 const range = (label: string, minDays: number, maxDays: number): AgeRange => ({
@@ -89,7 +93,9 @@ const AGE_12_PLUS = range('Adolescent/Adult (12 years and above)', 4381, 43800);
 const ADULT = range('Adult (18 years and above)', 6570, 43800);
 const ALL_AGES = range('All ages', 0, 43800);
 
-const curatedConditions: GuidelineCondition[] = [
+const curatedConditionsBase: Array<
+  Omit<GuidelineCondition, 'chapterIndex' | 'chapterTitle' | 'triageBucketId' | 'sourceEntryId'>
+> = [
   {
     id: 'sick-newborn-sepsis',
     title: 'Sick Newborn / Neonatal Sepsis',
@@ -784,9 +790,534 @@ const curatedConditions: GuidelineCondition[] = [
       ),
     ],
   },
+  {
+    id: 'constipation',
+    title: 'Constipation',
+    category: 'Gastrointestinal',
+    dataSource: 'curated',
+    ageSensitive: false,
+    duration: { minDays: 3, maxDays: 90, label: 'usually persistent over days to weeks' },
+    ageBands: [
+      band(
+        'all',
+        ALL_AGES,
+        'Constipation is suggested by infrequent hard stools, straining, incomplete evacuation, or obstructive bowel symptoms.',
+        evidence(
+          [
+            'constipation',
+            'passing hard stools',
+            'infrequent passing of stools',
+            'straining to pass stools',
+            'feeling of incomplete evacuation of bowel',
+            'inability to pass flatus',
+            'colicky abdominal pain',
+            'vomiting',
+          ],
+          [
+            'frequent high pitched bowel sounds',
+            'absent bowel sounds',
+            'peritonitis',
+            'abdominal mass',
+          ],
+          [
+            'digital rectal examination',
+            'stool for occult blood',
+            'plain abdominal x ray',
+            'proctoscopy or colonoscopy when obstruction is not suspected',
+          ],
+          ['passing hard stools', 'infrequent passing of stools'],
+          ['absent bowel sounds', 'peritonitis'],
+          ['vomiting', 'inability to pass flatus', 'peritonitis', 'absent bowel sounds'],
+          [
+            'refer suspected obstruction, surgical cause, or constipation resistant to treatment',
+          ],
+          [
+            'The STG emphasizes digital rectal examination for all patients with suspected constipation.',
+          ]
+        ),
+        [
+          tx('Non-drug care', 'Use regular exercise, a high fibre diet, and adequate fluid intake where there is no contraindication.'),
+          tx('Laxatives', 'Use age-appropriate stool softeners or laxatives such as lactulose, bisacodyl, senna, or glycerol suppositories according to the STG dosing tables.'),
+          tx('Escalation', 'Refer suspected obstruction or surgical causes urgently instead of escalating laxatives.'),
+        ],
+        { section: 'Section 3. Constipation', pdfPages: '37-40' }
+      ),
+    ],
+  },
+  {
+    id: 'peptic-ulcer-disease',
+    title: 'Peptic Ulcer Disease',
+    category: 'Gastrointestinal',
+    dataSource: 'curated',
+    ageSensitive: false,
+    duration: { minDays: 3, maxDays: 120, label: 'usually recurrent or persistent over days to months' },
+    ageBands: [
+      band(
+        'all',
+        ALL_AGES,
+        'Peptic ulcer disease is suggested by recurrent epigastric or upper abdominal burning pain, relation to meals, and dyspeptic symptoms.',
+        evidence(
+          [
+            'epigastric pain',
+            'burning epigastric pain',
+            'episodic abdominal pain',
+            'right hypochondrial pain',
+            'retrosternal pain',
+            'vomiting',
+            'peri umbilical pain',
+          ],
+          ['epigastric tenderness', 'weight loss', 'weight gain'],
+          [
+            'haemoglobin',
+            'h pylori stool antigen',
+            'endoscopy',
+            'barium meal',
+            'stool examination',
+          ],
+          ['epigastric pain', 'burning epigastric pain'],
+          ['epigastric tenderness'],
+          ['vomiting blood', 'melaena', 'gastric outlet obstruction', 'perforation'],
+          [
+            'refer failed medical treatment, h pylori eradication failure, or surgical complications',
+          ],
+          [
+            'The STG distinguishes gastric from duodenal ulcer by relation of pain to meals and warns that gastric ulcer may be malignant.',
+          ]
+        ),
+        [
+          tx('Non-drug care', 'Avoid alcohol, tobacco, and foods that aggravate symptoms, and reduce anxiety or stress where possible.'),
+          tx('Acid suppression', 'Use antacids or PPIs such as omeprazole, esomeprazole, or pantoprazole according to the STG.'),
+          tx('H. pylori eradication', 'When H. pylori is present, use a PPI plus two STG-recommended antibiotics for 10-14 days.'),
+        ],
+        { section: 'Section 4. Peptic Ulcer Disease', pdfPages: '40-43' }
+      ),
+    ],
+  },
+  {
+    id: 'gastro-oesophageal-reflux-disease',
+    title: 'Gastro-oesophageal Reflux Disease',
+    category: 'Gastrointestinal',
+    dataSource: 'curated',
+    ageSensitive: true,
+    duration: { minDays: 3, maxDays: 180, label: 'often recurrent or persistent over days to months' },
+    ageBands: [
+      band(
+        'child',
+        CHILD,
+        'In children, GORD is suggested by recurrent regurgitation, vomiting, poor feeding, cough, aspiration-type symptoms, or failure to thrive.',
+        evidence(
+          [
+            'failure to thrive',
+            'refusing food',
+            'vomiting',
+            'coughing',
+            'forceful regurgitation',
+            'shortness of breath',
+          ],
+          ['wheeze', 'epigastric tenderness'],
+          ['barium swallow', 'endoscopy when indicated', 'chest x ray'],
+          ['forceful regurgitation', 'failure to thrive'],
+          ['wheeze'],
+          ['aspiration pneumonia', 'difficulty swallowing', 'failure to thrive'],
+          ['refer severe disease, aspiration, or treatment failure'],
+          [
+            'The STG notes aspiration pneumonia and feeding difficulty as important paediatric clues.',
+          ]
+        ),
+        [
+          tx('Lifestyle and feeding', 'Use smaller feeds, avoid feeding close to sleep, keep the head elevated, and avoid aggravating triggers.'),
+          tx('Acid suppression', 'Use omeprazole according to the STG child weight bands when medication is indicated.'),
+          tx('Escalation', 'Refer severe cases, treatment failures, or children with complications such as aspiration.'),
+        ],
+        { section: 'Section 5. Gastro-oesophageal Reflux Disease', pdfPages: '43-45' }
+      ),
+      band(
+        'adult',
+        AGE_12_PLUS,
+        'In older children and adults, GORD is suggested by heartburn, retrosternal or epigastric pain, nocturnal regurgitation, dysphagia, or odynophagia.',
+        evidence(
+          [
+            'heartburn',
+            'dyspepsia',
+            'early satiety',
+            'retrosternal pain',
+            'epigastric pain',
+            'pain on swallowing',
+            'difficulty swallowing',
+            'nocturnal regurgitation',
+          ],
+          ['epigastric tenderness', 'wheeze'],
+          ['endoscopy', 'chest x ray', 'abdominal ultrasound', 'barium swallow', 'oesophageal ph monitoring'],
+          ['heartburn', 'nocturnal regurgitation'],
+          [],
+          ['difficulty swallowing', 'pain on swallowing', 'aspiration pneumonia'],
+          ['refer severe disease, complications, or treatment failure'],
+          [
+            'The STG specifically notes bending forward or lying flat as common aggravating factors for reflux symptoms.',
+          ]
+        ),
+        [
+          tx('Lifestyle measures', 'Elevate the head of the bed, avoid sleeping soon after meals, avoid heavy late meals, and reduce triggers such as fatty food, alcohol, smoking, and NSAIDs.'),
+          tx('Medicines', 'Use antacids or PPIs such as omeprazole, esomeprazole, or rabeprazole as outlined in the STG.'),
+          tx('Bloating or regurgitation', 'Add prokinetic therapy such as metoclopramide or domperidone only when STG indications fit.'),
+        ],
+        { section: 'Section 5. Gastro-oesophageal Reflux Disease', pdfPages: '43-45' }
+      ),
+    ],
+  },
+  {
+    id: 'haemorrhoids',
+    title: 'Haemorrhoids',
+    category: 'Gastrointestinal',
+    dataSource: 'curated',
+    ageSensitive: false,
+    duration: { minDays: 1, maxDays: 120, label: 'may be acute or recurrent over days to months' },
+    ageBands: [
+      band(
+        'all',
+        ALL_AGES,
+        'Haemorrhoids are suggested by bright red rectal bleeding, anal swelling, pruritus, prolapse, or painful thrombosed piles.',
+        evidence(
+          [
+            'bright red rectal bleeding',
+            'passage of bright red blood at defaecation',
+            'rectal bleeding',
+            'anal swelling',
+            'pruritus ani',
+            'discomfort after opening bowels',
+            'anal pain',
+            'mucoid discharge',
+          ],
+          [
+            'swelling at the anus',
+            'skin tags',
+            'thrombosed haemorrhoids',
+            'pallor',
+            'haemorrhagic shock',
+          ],
+          ['full blood count', 'proctoscopy', 'sigmoidoscopy'],
+          ['bright red rectal bleeding', 'anal swelling'],
+          ['thrombosed haemorrhoids', 'skin tags'],
+          ['haemorrhagic shock', 'profuse bleeding', 'strangulation', 'infection'],
+          ['refer for ligation or operative treatment when indicated'],
+          [
+            'The STG emphasizes digital rectal examination to exclude carcinoma and more sinister anorectal disease.',
+          ]
+        ),
+        [
+          tx('Non-drug care', 'Increase fluids and roughage, avoid prolonged straining, and use warm sitz baths for infected haemorrhoids.'),
+          tx('Symptom relief', 'Use topical soothing agents and address associated constipation with stool-softening therapy.'),
+          tx('Complications', 'Treat infected or anaemic cases according to the STG and refer for rubber band ligation or surgery when required.'),
+        ],
+        { section: 'Section 7. Haemorrhoids', pdfPages: '47-51' }
+      ),
+    ],
+  },
+  {
+    id: 'amoebic-liver-abscess',
+    title: 'Amoebic Liver Abscess',
+    category: 'Liver',
+    dataSource: 'curated',
+    ageSensitive: false,
+    duration: { minDays: 3, maxDays: 30, label: 'usually develops over days to weeks' },
+    ageBands: [
+      band(
+        'all',
+        ALL_AGES,
+        'Amoebic liver abscess is suggested by right upper abdominal pain, fever, hepatomegaly, and chest or shoulder-referred pain.',
+        evidence(
+          [
+            'right upper abdominal pain',
+            'right hypochondrial pain',
+            'fever',
+            'malaise',
+            'sweats',
+            'cough',
+            'hiccups',
+            'anorexia',
+            'weight loss',
+            'jaundice',
+            'diarrhoea',
+          ],
+          [
+            'large tender liver',
+            'tender intercostal swelling',
+            'hepatomegaly',
+            'jaundice',
+            'basal crepitations',
+            'peritonitis',
+          ],
+          ['abdominal ultrasound', 'chest x ray', 'full blood count', 'stool examination', 'serology'],
+          ['right upper abdominal pain', 'fever'],
+          ['large tender liver'],
+          ['peritonitis', 'empyema', 'jaundice'],
+          ['refer large abscesses or poor response to treatment'],
+          [
+            'The STG notes pyogenic liver abscess as an important clinical mimic.',
+          ]
+        ),
+        [
+          tx('Anti-amoebic treatment', 'Use a tissue agent such as metronidazole or tinidazole, then follow with a luminal agent such as diloxanide furoate or paromomycin according to the STG.'),
+          tx('Monitoring', 'Use abdominal ultrasound and reassess clinical response during therapy.'),
+          tx('Escalation', 'Refer large abscesses or cases with poor response for specialist review and possible aspiration.'),
+        ],
+        { section: 'Section 8. Amoebic Liver Access', pdfPages: '51-53' }
+      ),
+    ],
+  },
+  {
+    id: 'acute-hepatitis',
+    title: 'Acute Hepatitis',
+    category: 'Liver',
+    dataSource: 'curated',
+    ageSensitive: false,
+    duration: { minDays: 3, maxDays: 42, label: 'usually acute over days to weeks' },
+    ageBands: [
+      band(
+        'all',
+        ALL_AGES,
+        'Acute hepatitis is suggested by jaundice with dark urine, pale stools, right hypochondrial pain, fever, and liver tenderness.',
+        evidence(
+          [
+            'right hypochondrial pain',
+            'fever',
+            'malaise',
+            'anorexia',
+            'nausea',
+            'vomiting',
+            'dark urine',
+            'pale stools',
+            'itching',
+            'fatigue',
+            'confusion',
+          ],
+          ['jaundice', 'right hypochondrial tenderness', 'hepatomegaly', 'asterixis'],
+          ['full blood count', 'liver function tests', 'hepatitis screen', 'abdominal ultrasound'],
+          ['dark urine', 'pale stools'],
+          ['jaundice', 'right hypochondrial tenderness'],
+          ['confusion', 'asterixis', 'rapid progression', 'bleeding'],
+          ['refer rapidly progressive disease to a physician specialist'],
+          [
+            'The STG advises avoiding hepatotoxic drugs such as paracetamol and high doses of anxiolytic-hypnotics in acute hepatitis.',
+          ]
+        ),
+        [
+          tx('Supportive care', 'Use rest, high-calorie fluids, tolerated feeding, and IV fluids where needed, and avoid alcohol.'),
+          tx('Avoid harm', 'Avoid hepatotoxic medicines while evaluating the cause.'),
+          tx('Escalation', 'Refer rapidly progressive disease, encephalopathy, or bleeding promptly.'),
+        ],
+        { section: 'Section 10. Acute Hepatitis', pdfPages: '55-56' }
+      ),
+    ],
+  },
+  {
+    id: 'hepatic-encephalopathy',
+    title: 'Hepatic Encephalopathy',
+    category: 'Liver Emergency',
+    dataSource: 'curated',
+    ageSensitive: false,
+    duration: { minDays: 1, maxDays: 21, label: 'acute deterioration over hours to days' },
+    ageBands: [
+      band(
+        'all',
+        ALL_AGES,
+        'Hepatic encephalopathy is suggested by jaundice or chronic liver disease with confusion, disturbed consciousness, asterixis, or fetor hepaticus.',
+        evidence(
+          ['jaundice', 'confusion', 'disturbed consciousness', 'personality changes'],
+          [
+            'fetor hepaticus',
+            'asterixis',
+            'cyanosis',
+            'speech impairment',
+            'incoordination',
+            'lethargy',
+            'ascites',
+          ],
+          ['full blood count', 'blood glucose', 'liver function tests', 'urea and electrolytes', 'infection screen'],
+          ['confusion', 'disturbed consciousness'],
+          ['asterixis', 'fetor hepaticus'],
+          ['coma', 'severe dehydration', 'hypoglycaemia', 'active bleeding'],
+          ['refer if not improving; all children require specialist referral'],
+          [
+            'The STG specifically states that protein restriction should not be used in hepatic encephalopathy.',
+          ]
+        ),
+        [
+          tx('Immediate care', 'Place unconscious patients in the coma position and correct fluid, electrolyte, and glucose problems.'),
+          tx('Lower ammonia', 'Use lactulose orally or rectally and add STG-directed antibiotics such as metronidazole or rifaximin when indicated.'),
+          tx('Avoid precipitants', 'Avoid alcohol, paracetamol, sedatives, and other hepatotoxic or consciousness-impairing agents.'),
+        ],
+        { section: 'Section 12. Hepatic Encephalopathy', pdfPages: '60-64' }
+      ),
+    ],
+  },
 ];
 
+const chapter = (title: string): StgChapter => {
+  const value = getChapterByTitle(title);
+  if (!value) {
+    throw new Error(`Unknown STG chapter: ${title}`);
+  }
+  return value;
+};
+
+const GI_CHAPTER = chapter('Disorders of the Gastrointestinal Tract');
+const LIVER_CHAPTER = chapter('Disorders of the Liver');
+const NUTRITION_CHAPTER = chapter('Nutritional Disorders');
+const IMMUNISABLE_CHAPTER = chapter('Immunisable Diseases');
+const NEWBORN_CHAPTER = chapter('Problems of the Newborn (Neonate)');
+const RESPIRATORY_CHAPTER = chapter('Disorders of the Respiratory System');
+const CNS_CHAPTER = chapter('Disorders of the Central Nervous System');
+const INFECTIOUS_CHAPTER = chapter('Infectious Diseases and Infestations');
+const KIDNEY_CHAPTER = chapter('Disorders of the Kidney and Genitourinary System');
+
+const curatedConditionMetadata: Record<
+  string,
+  {
+    chapter: StgChapter;
+    triageBucketId: TriageBucketId;
+    sourceEntryId: string;
+  }
+> = {
+  'acute-diarrhoea': {
+    chapter: GI_CHAPTER,
+    triageBucketId: 'diarrhoea-dehydration',
+    sourceEntryId: 'diarrhoea',
+  },
+  'rotavirus-diarrhoea': {
+    chapter: GI_CHAPTER,
+    triageBucketId: 'diarrhoea-dehydration',
+    sourceEntryId: 'rotavirus-disease-and-diarrhoea',
+  },
+  constipation: {
+    chapter: GI_CHAPTER,
+    triageBucketId: 'gastrointestinal-bowel',
+    sourceEntryId: 'constipation',
+  },
+  'peptic-ulcer-disease': {
+    chapter: GI_CHAPTER,
+    triageBucketId: 'gastrointestinal-bowel',
+    sourceEntryId: 'peptic-ulcer-disease',
+  },
+  'gastro-oesophageal-reflux-disease': {
+    chapter: GI_CHAPTER,
+    triageBucketId: 'gastrointestinal-bowel',
+    sourceEntryId: 'gastro-oesophageal-reflux-disease',
+  },
+  haemorrhoids: {
+    chapter: GI_CHAPTER,
+    triageBucketId: 'gastrointestinal-bowel',
+    sourceEntryId: 'haemorrhoids',
+  },
+  'amoebic-liver-abscess': {
+    chapter: LIVER_CHAPTER,
+    triageBucketId: 'hepatobiliary',
+    sourceEntryId: 'amoebic-liver-access',
+  },
+  'acute-hepatitis': {
+    chapter: LIVER_CHAPTER,
+    triageBucketId: 'hepatobiliary',
+    sourceEntryId: 'acute-hepatitis',
+  },
+  'hepatic-encephalopathy': {
+    chapter: LIVER_CHAPTER,
+    triageBucketId: 'hepatobiliary',
+    sourceEntryId: 'hepatic-encephalopathy',
+  },
+  measles: {
+    chapter: IMMUNISABLE_CHAPTER,
+    triageBucketId: 'fever-systemic',
+    sourceEntryId: 'measles',
+  },
+  'sick-newborn-sepsis': {
+    chapter: NEWBORN_CHAPTER,
+    triageBucketId: 'fever-systemic',
+    sourceEntryId: 'sick-newborn',
+  },
+  'neonatal-hypoglycaemia': {
+    chapter: NEWBORN_CHAPTER,
+    triageBucketId: 'neurologic-meningeal',
+    sourceEntryId: 'neonatal-hypoglycaemia',
+  },
+  'neonatal-jaundice': {
+    chapter: NEWBORN_CHAPTER,
+    triageBucketId: 'hepatobiliary',
+    sourceEntryId: 'neonatal-jaundice',
+  },
+  'vitamin-a-deficiency-eye-disease': {
+    chapter: NUTRITION_CHAPTER,
+    triageBucketId: 'eye-nutrition',
+    sourceEntryId: 'xerophthalmia',
+  },
+  'common-cold': {
+    chapter: RESPIRATORY_CHAPTER,
+    triageBucketId: 'respiratory',
+    sourceEntryId: 'common-cold',
+  },
+  pneumonia: {
+    chapter: RESPIRATORY_CHAPTER,
+    triageBucketId: 'respiratory',
+    sourceEntryId: 'pneumonia',
+  },
+  'bronchial-asthma': {
+    chapter: RESPIRATORY_CHAPTER,
+    triageBucketId: 'respiratory',
+    sourceEntryId: 'bronchial-asthma',
+  },
+  'acute-bronchitis': {
+    chapter: RESPIRATORY_CHAPTER,
+    triageBucketId: 'respiratory',
+    sourceEntryId: 'acute-bronchitis',
+  },
+  meningitis: {
+    chapter: CNS_CHAPTER,
+    triageBucketId: 'neurologic-meningeal',
+    sourceEntryId: 'meningitis',
+  },
+  'uncomplicated-malaria': {
+    chapter: INFECTIOUS_CHAPTER,
+    triageBucketId: 'fever-systemic',
+    sourceEntryId: 'uncomplicated-malaria',
+  },
+  'severe-malaria': {
+    chapter: INFECTIOUS_CHAPTER,
+    triageBucketId: 'neurologic-meningeal',
+    sourceEntryId: 'severe-malaria',
+  },
+  tuberculosis: {
+    chapter: INFECTIOUS_CHAPTER,
+    triageBucketId: 'respiratory',
+    sourceEntryId: 'tuberculosis',
+  },
+  'typhoid-fever': {
+    chapter: INFECTIOUS_CHAPTER,
+    triageBucketId: 'fever-systemic',
+    sourceEntryId: 'typhoid-fever',
+  },
+  'urinary-tract-infection': {
+    chapter: KIDNEY_CHAPTER,
+    triageBucketId: 'urinary',
+    sourceEntryId: 'urinary-tract-infections',
+  },
+};
+
+const curatedConditions: GuidelineCondition[] = curatedConditionsBase.map((condition) => {
+  const metadata = curatedConditionMetadata[condition.id];
+  if (!metadata) {
+    throw new Error(`Missing chapter metadata for curated STG condition: ${condition.id}`);
+  }
+
+  return {
+    ...condition,
+    chapterIndex: metadata.chapter.index,
+    chapterTitle: metadata.chapter.title,
+    triageBucketId: metadata.triageBucketId,
+    sourceEntryId: metadata.sourceEntryId,
+  };
+});
+
 const curatedIds = new Set(curatedConditions.map((condition) => condition.id));
+const curatedSourceEntryIds = new Set(curatedConditions.map((condition) => condition.sourceEntryId));
 
 const normalizeSearchValue = (value: string) =>
   value
@@ -827,6 +1358,16 @@ const buildCuratedAliases = (title: string) => {
     aliases.add('diarrhoea');
   }
 
+  if (normalized === 'gastro oesophageal reflux disease') {
+    aliases.add('gord');
+    aliases.add('gerd');
+    aliases.add('reflux disease');
+  }
+
+  if (normalized === 'amoebic liver abscess') {
+    aliases.add('amoebic liver access');
+  }
+
   return Array.from(aliases);
 };
 
@@ -858,6 +1399,10 @@ const curatedSearchEntries: SearchableStgEntry[] = curatedConditions.map((condit
     title: condition.title,
     category: condition.category,
     sourceType: 'curated',
+    chapterIndex: condition.chapterIndex,
+    chapterTitle: condition.chapterTitle,
+    triageMode: 'ranked',
+    triageReason: getRankedReason(condition.chapterTitle),
     pdfPages,
     aliases,
     normalizedTitle: normalizeSearchValue(condition.title),
@@ -893,8 +1438,14 @@ const curatedNormalizedTitles = new Set(curatedSearchEntries.map((entry) => entr
 
 export const searchableGeneratedSections: SearchableStgEntry[] = generatedCorpus
   .filter((entry) => !curatedIds.has(entry.id))
+  .filter((entry) => !curatedSourceEntryIds.has(entry.id))
   .filter((entry) => !curatedNormalizedTitles.has(entry.normalizedTitle))
   .map<SearchableStgEntry | null>((entry) => {
+    const chapterMetadata = getChapterByTitle(entry.category);
+    if (!chapterMetadata) {
+      return null;
+    }
+
     const symptoms = sanitizeGeneratedTerms([
       ...entry.symptoms,
       ...entry.signsAndSymptoms,
@@ -918,6 +1469,10 @@ export const searchableGeneratedSections: SearchableStgEntry[] = generatedCorpus
       title: entry.title,
       category: entry.category,
       sourceType: 'generated',
+      chapterIndex: chapterMetadata.index,
+      chapterTitle: chapterMetadata.title,
+      triageMode: 'reference_only',
+      triageReason: getReferenceReason(entry.title, chapterMetadata.title),
       pdfPages: entry.pdfPages,
       aliases: entry.aliases,
       normalizedTitle: entry.normalizedTitle,
@@ -985,3 +1540,20 @@ export const signVocabulary = buildClinicalVocabulary([
 export const generatedCorpusCount = searchableGeneratedSections.length;
 
 export const guidelineConditions: GuidelineCondition[] = curatedConditions;
+
+export const stgChapterSummaries: StgChapterSummary[] = stgChapters.map((chapter) => {
+  const entries = searchableStgEntries.filter((entry) => entry.chapterIndex === chapter.index);
+  const rankedSections = entries.filter((entry) => entry.triageMode === 'ranked').length;
+  const referenceOnlySections = entries.filter((entry) => entry.triageMode === 'reference_only').length;
+  const excludedSections = entries.filter((entry) => entry.triageMode === 'excluded').length;
+
+  return {
+    index: chapter.index,
+    title: chapter.title,
+    totalSections: entries.length,
+    rankedSections,
+    referenceOnlySections,
+    excludedSections,
+    isComplete: entries.length > 0 && rankedSections + referenceOnlySections + excludedSections === entries.length,
+  };
+});
